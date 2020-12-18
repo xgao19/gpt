@@ -64,6 +64,7 @@ public:
   virtual GridBase* get_grid() = 0;
   virtual PyObject* advise(std::string type) = 0;
   virtual PyObject* prefetch(std::string type) = 0;
+  virtual void Project(cgpt_Lattice_base* src) = 0;
 };
 
 template<class T> class cgpt_Lattice;

@@ -223,3 +223,16 @@ inline void determinant(Lattice<iScalar<iScalar<iScalar<typename T::vector_type>
   ERR("Not implemented");
   
 }
+
+template<typename T>
+inline void projection(Lattice<T>& src){
+  ERR("Not implemented");
+
+}
+
+
+inline void projection(Lattice<iScalar<iScalar<iMatrix<vComplexD,3>>>>& src) {
+  std::cout << "3d level: projection" << std::endl;
+  ProjectSU3(src);
+
+}

@@ -106,6 +106,7 @@ public:
   }
 
   virtual void copy_from(cgpt_Lattice_base* _src) {
+    std::cout << "In copy_from" << std::endl;
     cgpt_Lattice<T>* src = compatible<T>(_src);
     l = src->l;
   }
@@ -134,8 +135,6 @@ public:
 		      compatible<T>(b)->l,
 		      compatible<T>(c)->l, params);
   }
-  
-
 
   virtual void cshift_from(cgpt_Lattice_base* _src, int dir, int off) {
     cgpt_Lattice<T>* src = compatible<T>(_src);
@@ -281,5 +280,13 @@ public:
     }
     return PyLong_FromLong(0);
   }
+  
+  virtual void Project(cgpt_Lattice_base* _src) {
+    cgpt_Lattice<T>* src = compatible<T>(_src);
+    std::cout << "ProjectOnGroup" << std::endl;
+    cgpt_ProjectSU3(src->l);
+    
+  }
 
 };
+

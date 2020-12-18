@@ -45,3 +45,10 @@ void cgpt_determinant(Lattice<T>& l, cgpt_Lattice_base* _det, std::vector<cgpt_L
 
   determinant(det, matrix, n_virtual);
 }
+
+template<typename T>
+void cgpt_ProjectSU3(Lattice<T>& l) {
+  std::cout << "2nd level: cgpt_ProjectSU3" << std::endl;
+  projection(l);
+
+}
