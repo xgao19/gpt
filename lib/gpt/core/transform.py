@@ -18,6 +18,16 @@
 #
 import cgpt, gpt, numpy
 
+def projectSU3(first):
+    if(type(first)==gpt.lattice):
+        l = gpt.eval(first)
+        # t = gpt.lattice(l)
+    else:
+        print("Type error in projectSU3")
+    for i in l.otype.v_idx:
+        # cgpt.ProjectSU3(t.v_obj[i], l.v_obj[i])
+        cgpt.ProjectSU3(l.v_obj[i])
+    # return t
 
 def cshift(first, second, third, fourth=None):
 

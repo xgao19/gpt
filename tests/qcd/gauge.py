@@ -42,14 +42,14 @@ for mu in range(len(U)):
     r = g.sum(g.det(C[mu])) / U[0].grid.gsites
     g.message(f"avg. Determinant of U[{mu}] = {q}, of C[{mu}] = {r}")
 
-C_u = []
+# C_u = []
 for mu in range(len(C)):
-    C_u.append(g.projectSU3(C[mu]))
+    g.projectSU3(C[mu])
 
-for mu in range(len(C_u)):
+for mu in range(len(C)):
     a = g.sum(g.det(C[mu])) / U[0].grid.gsites
-    b = g.sum(g.det(C_u[mu])) / U[0].grid.gsites
-    g.message(f"avg. Determinant of C[{mu}] = {a}, of C_u[{mu}] = {b}")
+    # b = g.sum(g.det(C_u[mu])) / U[0].grid.gsites
+    g.message(f"avg. Determinant of C[{mu}] = {a}")#", of C_u[{mu}] = {b}")
 # # Test stout smearing
 # U_stout = U
 # P_stout = []

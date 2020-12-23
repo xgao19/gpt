@@ -29,6 +29,7 @@ from gpt.core.time import time, timer
 from gpt.core.log import message
 from gpt.core.convert import convert
 from gpt.core.transform import (
+    projectSU3,
     cshift,
     copy,
     norm2,
@@ -76,3 +77,4 @@ import gpt.core.block
 import gpt.core.matrix
 import gpt.core.component
 import gpt.core.coarse
+from gpt.core.matrix import det

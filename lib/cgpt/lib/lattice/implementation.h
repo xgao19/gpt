@@ -281,10 +281,8 @@ public:
     return PyLong_FromLong(0);
   }
   
-  virtual void Project(cgpt_Lattice_base* _src) {
-    cgpt_Lattice<T>* src = compatible<T>(_src);
-    std::cout << "ProjectOnGroup" << std::endl;
-    cgpt_ProjectSU3(src->l);
+  virtual void Project() {
+    cgpt_ProjectSU3(l);
     
   }
 

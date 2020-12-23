@@ -232,7 +232,6 @@ inline void projection(Lattice<T>& src){
 
 
 inline void projection(Lattice<iScalar<iScalar<iMatrix<vComplexD,3>>>>& src) {
-  std::cout << "3d level: projection" << std::endl;
   ProjectSU3(src);
 
 }
