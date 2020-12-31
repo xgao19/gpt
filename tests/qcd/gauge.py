@@ -69,6 +69,15 @@ for i in range(3):
 g.message(f"Hyp smeared plaquettes {P_hyp}")
 assert sorted(P_hyp) == P_hyp  # make sure plaquettes go towards one
 
+U_prime = g.gauge_fix(U)
+
+print(U)
+print(U_prime)
+
+P_prime = g.qcd.gauge.plaquette(U_prime)
+
+eps = abs(P - P_prime)
+g.message(f"Plaquette before {P} and after {P_prime} gauge fixing: {eps}")
 
 # # Test stout smearing
 # U_stout = U

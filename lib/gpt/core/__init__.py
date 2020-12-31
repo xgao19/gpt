@@ -29,6 +29,7 @@ from gpt.core.time import time, timer
 from gpt.core.log import message
 from gpt.core.convert import convert
 from gpt.core.transform import (
+    gauge_fix,
     projectSU3,
     cshift,
     copy,
