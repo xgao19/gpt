@@ -50,6 +50,26 @@ for mu in range(len(C)):
     a = g.sum(g.det(C[mu])) / U[0].grid.gsites
     # b = g.sum(g.det(C_u[mu])) / U[0].grid.gsites
     g.message(f"avg. Determinant of C[{mu}] = {a}")#", of C_u[{mu}] = {b}")
+
+
+
+# Test HYP smearing
+U_hyp = U
+P_hyp = []
+for i in range(3):
+    U_hyp = g.qcd.gauge.smear.hyp(U_hyp, alpha = np.array([0.1, 0.2, 0.3]))
+
+    for mu in range(len(U_hyp)):
+        I = g.identity(U_hyp[mu])
+        eps2 = g.norm2(U_hyp[mu] * g.adj(U_hyp[mu]) - I) / g.norm2(I)
+        g.message(f"Unitarity check of hyp-smeared links: mu = {mu}, eps2 = {eps2}")
+
+    P_hyp.append(g.qcd.gauge.plaquette(U_hyp))
+
+g.message(f"Hyp smeared plaquettes {P_hyp}")
+assert sorted(P_hyp) == P_hyp  # make sure plaquettes go towards one
+
+
 # # Test stout smearing
 # U_stout = U
 # P_stout = []

@@ -106,7 +106,6 @@ public:
   }
 
   virtual void copy_from(cgpt_Lattice_base* _src) {
-    std::cout << "In copy_from" << std::endl;
     cgpt_Lattice<T>* src = compatible<T>(_src);
     l = src->l;
   }

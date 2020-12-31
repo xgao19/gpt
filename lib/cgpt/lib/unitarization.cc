@@ -3,7 +3,7 @@
 
 EXPORT(ProjectSU3,{
     
-    void* _dst,* _src;
+    void* _src;
     if (!PyArg_ParseTuple(args, "l", &_src)) {
       std::cout << "C code: problems parsing arguments" << std::endl;
       return NULL;
