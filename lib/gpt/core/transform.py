@@ -52,13 +52,22 @@ def gauge_fix(first):
 
     return result, fix
 
-def projectSU3(first):
+def projectStout(first):
     if(type(first)==gpt.lattice):
         l = gpt.eval(first)
     else:
+        print("Type error in projectStout")
+    for i in l.otype.v_idx:
+        cgpt.ProjectStout(l.v_obj[i])
+
+def projectSU3(first, second):
+    if(type(first)==gpt.lattice and type(second)==gpt.lattice):
+        l = gpt.eval(first)
+        m = gpt.eval(second)
+    else:
         print("Type error in projectSU3")
     for i in l.otype.v_idx:
-        cgpt.ProjectSU3(l.v_obj[i])
+        cgpt.Projectnew(l.v_obj[i], m.v_obj[i])
 
 def cshift(first, second, third, fourth=None):
 

@@ -31,6 +31,7 @@ from gpt.core.convert import convert
 from gpt.core.transform import (
     gauge_fix,
     projectSU3,
+    projectStout,
     cshift,
     copy,
     norm2,

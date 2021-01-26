@@ -21,107 +21,117 @@ import gpt as g
 from gpt.params import params_convention
 
 
-# HYP smearing as in Chroma but with SU3 projection from Grid
+# HYP smearing as in QLUA
 
 @params_convention(alpha=None)
 def hyp(U, params):
-    nd = len(U)
 
     alpha = params["alpha"]
     assert alpha is not None
     assert alpha.shape == (3,)
-    
-    U_prime = []
-    V1 = []
-    
-    #lvl 1 smearing
-    #ii = -1
 
-    for mu in range(nd):
-        for nu in range(nd):
-            if mu==nu:
+    U_hyp = []
+
+    #lvl 1 smearing
+
+    ftmp2 = alpha[2]/2.0/(1.0-alpha[2])
+
+    V1 = {}
+
+    for mu in range(4):
+        V1[mu] = {}
+        for nu in range(4):
+            V1[mu][nu] = {}
+
+    staple = g.lattice(U[0])
+    Y = g.lattice(U[0])
+
+
+    for mu in range(4):
+
+        g.copy(Y, U[mu])
+
+        for nu in range(4):
+
+            if(nu==mu):
                 continue
-            #ii+=1
-            u_tmp = g.qcd.gauge.smear.staple(U, mu, nu)
-            # V_ii= g((1.0-rho)*U[mu]+rho/2.0*u_tmp)
-            v1_tmp = g.expr_eval((1.0-alpha[2])*U[mu]+alpha[2]/2.0*u_tmp) 
-            g.projectSU3(v1_tmp)
-            V1.append(v1_tmp)
-    
-    # ii=-1
+
+            # for rho in range(4):
+            for rho in range (nu+1,4):
+
+                if(rho==nu or rho==mu):
+                    continue
+       
+                staple[:] = 0
+                #sigma = [x for x in range(4) if x not in [mu,nu,rho]][0]
+                for sigma in [x for x in range(4) if x not in [mu,nu,rho]]:
+                    U_tmp = g.cshift(U[sigma], mu, 1)
+                    staple += U[sigma]*g.cshift(U[mu], sigma, 1)*g.adj(U_tmp)
+                    staple += g.cshift(g.adj(U[sigma])*U[mu]*U_tmp, sigma, -1)
+
+                
+                X = g.eval(g.adj(U[mu] + ftmp2*staple))
+                g.projectSU3(X, Y)
+
+                V1[mu][nu][rho] = g.lattice(U[0])
+                V1[mu][rho][nu] = g.lattice(U[0])
+
+                g.copy(V1[mu][nu][rho], Y)
+                g.copy(V1[mu][nu][rho], Y)
+
+    #lvl 1 complete
 
     #lvl 2 smearing
-    V2 = []
-    for mu in range(nd):
-        for nu in range(nd):
-            # ii+=1
-            first = True
-            for eta in range(nd):
-                if(eta == mu or eta==nu):
-                    continue
-                for jj in range(nd):
-                    if(jj != mu and jj != nu and jj != eta):
-                        sigma = jj
-                jj = (nd-1)*mu + sigma
-                if(sigma > mu):
-                    jj-=1
-                kk = (nd-1)*eta + sigma
-                if(sigma > eta):
-                    kk-=1
 
-                #forward staple:
-                #u_tmp += #u_lv1[kk] * shift(u_lv1[jj],FORWARD,rho) * adj(shift(u_lv1[kk],FORWARD,mu));
-                if(first):
-                    u_tmp = V1[kk]*g.cshift(V1[jj], eta, 1)*g.adj(g.cshift(V1[kk], mu,1))
-                    first = False
-                else:
-                    u_tmp = u_tmp + V1[kk]*g.cshift(V1[jj], eta, 1)*g.adj(g.cshift(V1[kk], mu,1))
-                 
-                
-                #backward staple:
-                # u_tmp(x) += u_lv1_dag(x-rho,kk)*u_lv1(x-rho,jj)*u_lv1(x-rho+mu,kk)
-                tmp= g.cshift(V1[kk], mu ,1)
-                tmp2 = g.adj(V1[kk])* V1[jj] * tmp
-                u_tmp = u_tmp + g.cshift(tmp2, eta , -1)
-            
-            tmp_v2 = g.expr_eval((1.0-alpha[1])*U[mu] + alpha[1]/4.0 * u_tmp)
-            g.projectSU3(tmp_v2)
-            V2.append(tmp_v2)
-    
-    #construct hyp links:
-    V3 = []
-    for mu in range(nd):
-        first = True
-        for nu in range(nd):
-            if( mu == nu):
+    ftmp2 = alpha[1]/4.0/(1.0-alpha[1])
+
+    V2 = {}
+    for mu in range(4):
+        V2[mu] = {}
+        g.copy(Y,U[mu])
+
+    for mu in range(4):
+        for nu in range(4):
+            if(nu==mu):
                 continue
-            jj = (nd-1)*mu + nu
-            if( nu > mu ):
-                jj-=1
-            kk = (nd-1)*nu + mu
-            if( mu > nu ):
-                kk -= 1
-            #forward staple
-            #u_tmp(x) += u_lv2(x,kk)*u_lv2(x+nu,jj)*u_lv2_dag(x+mu,kk)
-            if(first):
-                u_tmp = V2[kk]*g.cshift(V2[jj], nu, 1)*g.adj(g.cshift(V2[kk], mu, 1))
-                first = False
-            else:
-                u_tmp = u_tmp + V2[kk]*g.cshift(V2[jj], nu, 1)*g.adj(g.cshift(V2[kk], mu, 1))
-            
-            #backward staple
-            #u_tmp(x) += u_lv2_dag(x-nu,kk)*u_lv2(x-nu,jj)*u_lv2(x-nu+mu,kk)
-            tmp = g.cshift(V2[kk], mu, 1)
-            tmp2 = g.adj(V2[kk]) * V2[jj] * tmp
-            u_tmp = u_tmp + g.cshift(tmp2, nu, -1)
+            staple[:] = 0
 
-        tmp_v3 = g.expr_eval((1-alpha[0])*U[mu] + alpha[0]/6.0*u_tmp)
-        g.projectSU3(tmp_v3)
+            for sigma in range(4):
+                if(sigma==nu or sigma==mu):
+                    continue
 
-        U_prime.append(tmp_v3)
+                V_tmp = g.cshift(V1[sigma][mu][nu] ,mu, 1)
+                staple += V1[sigma][mu][nu]*g.cshift(V1[mu][sigma][nu],sigma,1)*g.adj(V_tmp)
+                staple += g.cshift(g.adj(V1[sigma][mu][nu])*V1[mu][sigma][nu]*V_tmp , sigma, -1)
 
-    return U_prime
-                
+            X = g.eval(g.adj(U[mu] + ftmp2*staple))
+            g.projectSU3(X, Y)
 
+            V2[mu][nu] = g.lattice(U[0])
+            g.copy(V2[mu][nu], Y)
+
+    #lvl 2 complete
+
+    #lvl 3 smearing
+
+    ftmp2 = alpha[0]/6.0/(1.0-alpha[0])
+
+    for mu in range(4):
+        g.copy(Y, U[mu])
+        staple[:] = 0
+        for sigma in range(4):
+            if(sigma==mu):
+                continue
+
+            V_tmp = g.cshift(V2[sigma][mu], mu, 1)
+            staple += V2[sigma][mu]*g.cshift(V2[mu][sigma], sigma, 1)*g.adj(V_tmp)
+            staple += g.cshift(g.adj(V2[sigma][mu])*V2[mu][sigma]*V_tmp , sigma, -1)
+
+        X = g.eval(g.adj(U[mu] + ftmp2*staple))
+        g.projectSU3(X, Y)
+        U_hyp.append(Y)
+
+    
+    return U_hyp
 
     
