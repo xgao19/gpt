@@ -34,104 +34,223 @@ def hyp(U, params):
 
     #lvl 1 smearing
 
-    ftmp2 = alpha[2]/2.0/(1.0-alpha[2])
+    ftmp = alpha[2]/2.0/(1.0-alpha[2])
 
     V1 = {}
+    
+    Y = g.lattice(U[0])
+    staple = g.lattice(U[0])
 
     for mu in range(4):
         V1[mu] = {}
         for nu in range(4):
-            V1[mu][nu] = {}
-
-    staple = g.lattice(U[0])
-    Y = g.lattice(U[0])
-
-
-    for mu in range(4):
-
-        g.copy(Y, U[mu])
-
-        for nu in range(4):
-
             if(nu==mu):
                 continue
+            V1[mu][nu] = {}
 
-            # for rho in range(4):
-            for rho in range (nu+1,4):
+    for mu in range(4):
+        g.copy(Y,U[mu])
 
-                if(rho==nu or rho==mu):
+        for nu in range(4):
+            if(nu==mu):
+                continue
+            for rho in range(nu+1,4):
+                if(rho==mu or rho ==nu):
                     continue
-       
                 staple[:] = 0
-                #sigma = [x for x in range(4) if x not in [mu,nu,rho]][0]
                 for sigma in [x for x in range(4) if x not in [mu,nu,rho]]:
-                    U_tmp = g.cshift(U[sigma], mu, 1)
-                    staple += U[sigma]*g.cshift(U[mu], sigma, 1)*g.adj(U_tmp)
-                    staple += g.cshift(g.adj(U[sigma])*U[mu]*U_tmp, sigma, -1)
+                    Us_f = g.cshift(U[sigma], mu, 1)
 
-                
-                X = g.eval(g.adj(U[mu] + ftmp2*staple))
+                    staple += U[sigma] * g.cshift(U[mu], sigma, 1) * g.adj(Us_f)
+                    staple += g.cshift(g.adj(U[sigma]) * U[mu] * Us_f, sigma, -1)
+
+                X = g.eval(g.adj(U[mu] + ftmp * staple))
+
                 g.projectSU3(X, Y)
 
-                V1[mu][nu][rho] = g.lattice(U[0])
+                V1[mu][nu][rho] = g.lattice(U[0]) 
                 V1[mu][rho][nu] = g.lattice(U[0])
 
                 g.copy(V1[mu][nu][rho], Y)
-                g.copy(V1[mu][nu][rho], Y)
+                g.copy(V1[mu][rho][nu], Y)
 
-    #lvl 1 complete
+    # lvl 1 complete
 
-    #lvl 2 smearing
+    # lvl 2 smearing
 
-    ftmp2 = alpha[1]/4.0/(1.0-alpha[1])
+    ftmp = alpha[1]/4.0/(1.0-alpha[1])
 
     V2 = {}
-    for mu in range(4):
-        V2[mu] = {}
-        g.copy(Y,U[mu])
 
     for mu in range(4):
+        V2[mu] = {}
+        g.copy(Y, U[mu])
+
         for nu in range(4):
             if(nu==mu):
                 continue
-            staple[:] = 0
 
+            staple[:] = 0
             for sigma in range(4):
-                if(sigma==nu or sigma==mu):
+                if(sigma==mu or sigma==nu):
                     continue
 
-                V_tmp = g.cshift(V1[sigma][mu][nu] ,mu, 1)
-                staple += V1[sigma][mu][nu]*g.cshift(V1[mu][sigma][nu],sigma,1)*g.adj(V_tmp)
-                staple += g.cshift(g.adj(V1[sigma][mu][nu])*V1[mu][sigma][nu]*V_tmp , sigma, -1)
+                Vsmn_f = g.cshift(V1[sigma][mu][nu], mu, 1)
+                staple += V1[sigma][mu][nu] * g.cshift(V1[mu][sigma][nu], sigma, 1) * g.adj(Vsmn_f)
+                staple += g.cshift(g.adj(V1[sigma][mu][nu]) * V1[mu][sigma][nu] * Vsmn_f, sigma, -1)
 
-            X = g.eval(g.adj(U[mu] + ftmp2*staple))
+            X = g.eval(g.adj(U[mu] + ftmp * staple))
             g.projectSU3(X, Y)
 
             V2[mu][nu] = g.lattice(U[0])
             g.copy(V2[mu][nu], Y)
+    
+    # lvl 2 complete
 
-    #lvl 2 complete
+    # lvl 3 smearing
 
-    #lvl 3 smearing
+    ftmp = alpha[0]/6.0/(1.0-alpha[0])
 
-    ftmp2 = alpha[0]/6.0/(1.0-alpha[0])
+    U_hyp = {}
 
     for mu in range(4):
         g.copy(Y, U[mu])
         staple[:] = 0
+
         for sigma in range(4):
             if(sigma==mu):
                 continue
 
-            V_tmp = g.cshift(V2[sigma][mu], mu, 1)
-            staple += V2[sigma][mu]*g.cshift(V2[mu][sigma], sigma, 1)*g.adj(V_tmp)
-            staple += g.cshift(g.adj(V2[sigma][mu])*V2[mu][sigma]*V_tmp , sigma, -1)
+            Vsm_f = g.cshift(V2[sigma][mu], mu, 1)
 
-        X = g.eval(g.adj(U[mu] + ftmp2*staple))
+            staple += V2[sigma][mu] * g.cshift(V2[mu][sigma], sigma, 1) * g.adj(Vsm_f)
+            staple += g.cshift(g.adj(V2[sigma][mu]) * V2[mu][sigma] * Vsm_f, sigma, -1)
+
+        X = g.eval(g.adj(U[mu] + ftmp * staple))
         g.projectSU3(X, Y)
-        U_hyp.append(Y)
+
+        U_hyp[mu] = g.lattice(U[0])
+        g.copy(U_hyp[mu], Y)
 
     
     return U_hyp
+
+
+
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+    # V1 = {}
+
+    # for mu in range(4):
+    #     V1[mu] = {}
+    #     for nu in range(4):
+    #         V1[mu][nu] = {}
+
+    # staple = g.lattice(U[0])
+    # Y = g.lattice(U[0])
+
+
+    # for mu in range(4):
+
+    #     g.copy(Y, U[mu])
+
+    #     for nu in range(4):
+
+    #         if(nu==mu):
+    #             continue
+
+    #         # for rho in range(4):
+    #         for rho in range (nu+1,4):
+
+    #             if(rho==nu or rho==mu):
+    #                 continue
+       
+    #             staple[:] = 0
+    #             #sigma = [x for x in range(4) if x not in [mu,nu,rho]][0]
+    #             for sigma in [x for x in range(4) if x not in [mu,nu,rho]]:
+    #                 U_tmp = g.cshift(U[sigma], mu, 1)
+    #                 staple += U[sigma]*g.cshift(U[mu], sigma, 1)*g.adj(U_tmp)
+    #                 staple += g.cshift(g.adj(U[sigma])*U[mu]*U_tmp, sigma, -1)
+
+                
+    #             X = g.eval(g.adj(U[mu] + ftmp2*staple))
+    #             g.projectSU3(X, Y)
+
+    #             V1[mu][nu][rho] = g.lattice(U[0])
+    #             V1[mu][rho][nu] = g.lattice(U[0])
+
+    #             g.copy(V1[mu][nu][rho], Y)
+    #             g.copy(V1[mu][nu][rho], Y)
+
+    # #lvl 1 complete
+
+    # #lvl 2 smearing
+
+    # ftmp2 = alpha[1]/4.0/(1.0-alpha[1])
+
+    # V2 = {}
+    # for mu in range(4):
+    #     V2[mu] = {}
+    #     g.copy(Y,U[mu])
+
+    # for mu in range(4):
+    #     for nu in range(4):
+    #         if(nu==mu):
+    #             continue
+    #         staple[:] = 0
+
+    #         for sigma in range(4):
+    #             if(sigma==nu or sigma==mu):
+    #                 continue
+
+    #             V_tmp = g.cshift(V1[sigma][mu][nu] ,mu, 1)
+    #             staple += V1[sigma][mu][nu]*g.cshift(V1[mu][sigma][nu],sigma,1)*g.adj(V_tmp)
+    #             staple += g.cshift(g.adj(V1[sigma][mu][nu])*V1[mu][sigma][nu]*V_tmp , sigma, -1)
+
+    #         X = g.eval(g.adj(U[mu] + ftmp2*staple))
+    #         g.projectSU3(X, Y)
+
+    #         V2[mu][nu] = g.lattice(U[0])
+    #         g.copy(V2[mu][nu], Y)
+
+    # #lvl 2 complete
+
+    # #lvl 3 smearing
+
+    # ftmp2 = alpha[0]/6.0/(1.0-alpha[0])
+
+    # for mu in range(4):
+    #     g.copy(Y, U[mu])
+    #     staple[:] = 0
+    #     for sigma in range(4):
+    #         if(sigma==mu):
+    #             continue
+
+    #         V_tmp = g.cshift(V2[sigma][mu], mu, 1)
+    #         staple += V2[sigma][mu]*g.cshift(V2[mu][sigma], sigma, 1)*g.adj(V_tmp)
+    #         staple += g.cshift(g.adj(V2[sigma][mu])*V2[mu][sigma]*V_tmp , sigma, -1)
+
+    #     X = g.eval(g.adj(U[mu] + ftmp2*staple))
+    #     g.projectSU3(X, Y)
+    #     U_hyp.append(Y)
+
+    
+    # return U_hyp
 
     
