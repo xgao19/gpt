@@ -79,6 +79,7 @@ void eval_convert_factors(PyObject* _list, std::vector<_eval_term_>& terms, int 
 	ASSERT(v_obj);
 	cgpt_convert(v_obj, factor.vlattice);
 	factor.type = _eval_factor_::LATTICE;
+	Py_DECREF(v_obj);
       } else if (PyObject_HasAttrString(f,"array")) {
 	factor.array = (PyArrayObject*)PyObject_GetAttrString(f,"array");
 	PyObject* otype = PyObject_GetAttrString(f,"otype");
@@ -87,11 +88,15 @@ void eval_convert_factors(PyObject* _list, std::vector<_eval_term_>& terms, int 
 	ASSERT(v_otype);
 	cgpt_convert(v_otype,factor.v_otype);
 	factor.type = _eval_factor_::ARRAY;
+	Py_DECREF(otype);
+	Py_DECREF(v_otype);
       } else if (PyObject_HasAttrString(f,"gamma")) {
-	int gamma = (int)PyLong_AsLong(PyObject_GetAttrString(f,"gamma"));
+	PyObject* tmp = PyObject_GetAttrString(f,"gamma");
+	int gamma = (int)PyLong_AsLong(tmp);
 	ASSERT(gamma >= 0 && gamma < gamma_algebra_map_max);
 	factor.gamma = gamma_algebra_map[gamma];
 	factor.type = _eval_factor_::GAMMA;
+	Py_DECREF(tmp);
       } else {
 	ASSERT(0);
       }
@@ -217,24 +222,33 @@ void eval_general(std::vector<cgpt_Lattice_base*>& dst, std::vector<_eval_term_>
   for (int j=0;j<NUM_FACTOR_UNARY;j++) {
     auto & a = terms_a[j];
     if (a.size() > 0) {
-      if (dst.size() == 0)
-	dst.resize(a.size(),0);
-      ASSERT(dst.size() == a.size());
 
       bool mtrans = (j & BIT_TRANS) != 0;
+      bool trace = (unary & BIT_COLORTRACE) != 0;
+      size_t n_dst = trace ? 1 : a.size();
+      
+      if (dst.size() == 0)
+	dst.resize(n_dst,0);
+
+      ASSERT(dst.size() == n_dst);
+
       int singlet_rank = a[0][0].get_lat()->singlet_rank();
       int singlet_dim  = size_to_singlet_dim(singlet_rank, (int)a.size());
 
       if (singlet_rank == 2) {
 	for (int r=0;r<singlet_dim;r++) {
 	  for (int s=0;s<singlet_dim;s++) {
-	    int idx1 = r*singlet_dim + s;
-	    int idx2 = mtrans ? (s*singlet_dim + r) : idx1;
-	    dst[idx1] = a[idx2][0].get_lat()->compatible_linear_combination(dst[idx1],ac, a[idx2], j, unary);
+	    int idx1 = trace ? 0 : (r*singlet_dim + s);
+	    int idx2 = mtrans ? (s*singlet_dim + r) : (r*singlet_dim + s);
+	    if (trace && s != r)
+	      continue;
+	    dst[idx1] = a[idx2][0].get_lat()->compatible_linear_combination(dst[idx1],ac, a[idx2], j, unary | (trace ? BIT_SPINTRACE : 0));
+	    if (trace)
+	      ac=true;
 	  }
 	}
       } else {
-	for (int l=0;l<(int)a.size();l++) {
+	for (int l=0;l<(int)dst.size();l++) {
 	  dst[l] = a[l][0].get_lat()->compatible_linear_combination(dst[l],ac, a[l], j, unary);
 	}
       }

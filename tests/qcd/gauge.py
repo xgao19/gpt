@@ -13,40 +13,35 @@ U = g.qcd.gauge.random(g.grid([8, 8, 8, 16], g.double), rng)
 V = rng.element(g.lattice(U[0]))
 U_transformed = g.qcd.gauge.transformed(U, V)
 
-# Test gauge invariance of plaquette
+# reference plaquette
 P = g.qcd.gauge.plaquette(U)
+
+# test rectangle calculation using parallel transport and copy_plan
+R_1x1, R_2x1 = g.qcd.gauge.rectangle(U, [(1, 1), (2, 1)])
+eps = abs(P - R_1x1)
+g.message(f"Plaquette {P} versus 1x1 rectangle {R_1x1}: {eps}")
+assert eps < 1e-13
+
+# Test gauge invariance of plaquette
 P_transformed = g.qcd.gauge.plaquette(U_transformed)
 eps = abs(P - P_transformed)
 g.message(f"Plaquette before {P} and after {P_transformed} gauge transformation: {eps}")
+assert eps < 1e-13
+
+# Test gauge invariance of R_2x1
+R_2x1_transformed = g.qcd.gauge.rectangle(U_transformed, 2, 1)
+eps = abs(R_2x1 - R_2x1_transformed)
+g.message(
+    f"R_2x1 before {R_2x1} and after {R_2x1_transformed} gauge transformation: {eps}"
+)
 assert eps < 1e-13
 
 # Test gauge covariance of staple
 rho = np.array(
     [[0.0 if i == j else 0.1 for i in range(4)] for j in range(4)], dtype=np.float64
 )
-C = g.qcd.gauge.smear.staple_sum(U, rho=rho)
-# C_transformed = g.qcd.gauge.smear.staple_sum(U_transformed, rho=rho)
-# for mu in range(len(C)):
-#     q = g.sum(g.trace(C[mu] * g.adj(U[mu]))) / U[0].grid.gsites
-#     q_transformed = (
-#         g.sum(g.trace(C_transformed[mu] * g.adj(U_transformed[mu]))) / U[0].grid.gsites
-#     )
-
-#     eps = abs(q - q_transformed)
-#     g.message(
-#         f"Staple q[{mu}] before {q} and after {q_transformed} gauge transformation: {eps}"
-#     )
-#     assert eps < 1e-14
-for mu in range(len(U)):
-    q = g.sum(g.det(U[mu])) / U[0].grid.gsites
-    r = g.sum(g.det(C[mu])) / U[0].grid.gsites
-    g.message(f"avg. Determinant of U[{mu}] = {q}, of C[{mu}] = {r}")
-
-# C_u = []
-for mu in range(len(C)):
-    # g.projectSU3(C[mu])
-    g.projectSU3(U[mu],g.eval(g.adj(C[mu])))
-
+C = g.qcd.gauge.staple_sum(U, rho=rho)
+C_transformed = g.qcd.gauge.staple_sum(U_transformed, rho=rho)
 for mu in range(len(C)):
     a = g.sum(g.det(U[mu])) / U[0].grid.gsites
     # b = g.sum(g.det(C_u[mu])) / U[0].grid.gsites

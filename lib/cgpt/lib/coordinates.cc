@@ -77,7 +77,7 @@ EXPORT(coordinates_from_cartesian_view,{
     dims.push_back((points+cbf-1)/cbf);
     dims.push_back(Nd);
 
-    PyArrayObject* a = (PyArrayObject*)PyArray_SimpleNew((int)dims.size(), &dims[0], NPY_INT32);
+    PyArrayObject* a = cgpt_new_PyArray((int)dims.size(), &dims[0], NPY_INT32);
     int32_t* d = (int32_t*)PyArray_DATA(a);
 
     bool first_on_lattice;
@@ -158,7 +158,7 @@ EXPORT(coordinates_from_block,{
       for (int i=0;i<Nd;i++)
 	c_block_top[i] = c_top[i] + c_block_coor[i] * c_block_size[i];
       
-      PyArrayObject* a = (PyArrayObject*)PyArray_SimpleNew((int)dims.size(), &dims[0], NPY_INT32);
+      PyArrayObject* a = cgpt_new_PyArray((int)dims.size(), &dims[0], NPY_INT32);
       int32_t* d = (int32_t*)PyArray_DATA(a);
       
       if (Nd == 5) {
@@ -213,7 +213,7 @@ EXPORT(coordinates_inserted_dimension,{
     long xds = xdim.size();
     dims[0] = nc * xds;
     dims[1] = nd;
-    PyArrayObject* a = (PyArrayObject*)PyArray_SimpleNew((int)dims.size(), &dims[0], NPY_INT32);
+    PyArrayObject* a = cgpt_new_PyArray((int)dims.size(), &dims[0], NPY_INT32);
     int32_t* d = (int32_t*)PyArray_DATA(a);
     int32_t* s = (int32_t*)PyArray_DATA(coordinates);
 
@@ -258,7 +258,7 @@ EXPORT(coordinates_momentum_phase,{
     std::vector<long> dims(2);
     dims[0]=nc;
     dims[1]=1;
-    PyArrayObject* a = (PyArrayObject*)PyArray_SimpleNew((int)dims.size(),&dims[0],dtype);
+    PyArrayObject* a = cgpt_new_PyArray((int)dims.size(),&dims[0],dtype);
     if (dtype == NPY_COMPLEX64) {
       ComplexF* d = (ComplexF*)PyArray_DATA(a);
 
@@ -286,6 +286,46 @@ EXPORT(coordinates_momentum_phase,{
 	});
     }
 
+    return (PyObject*)a;
+  });
+
+EXPORT(coordinates_shift,{
+
+    // exp(i x mom)
+    PyObject* _coordinates, * _shift, * _size;
+    if (!PyArg_ParseTuple(args, "OOO", &_coordinates,&_shift,&_size)) {
+      return NULL;
+    }
+
+    std::vector<long> shift, size;
+    cgpt_convert(_shift,shift);
+    cgpt_convert(_size,size);
+
+   
+    ASSERT(cgpt_PyArray_Check(_coordinates));
+    PyArrayObject* coordinates = (PyArrayObject*)_coordinates;
+    ASSERT(PyArray_TYPE(coordinates)==NPY_INT32);
+    ASSERT(PyArray_NDIM(coordinates) == 2);
+    long* tdim = PyArray_DIMS(coordinates);
+    long nc    = tdim[0];
+    long nd    = tdim[1];
+    int32_t* s = (int32_t*)PyArray_DATA(coordinates);
+    ASSERT(nd == shift.size());
+    ASSERT(nd == size.size());
+    
+    for (long i=0;i<nd;i++)
+      while (shift[i] < 0)
+	shift[i] += size[i];
+    
+    PyArrayObject* a = cgpt_new_PyArray(2,tdim,NPY_INT32);
+    int32_t* d = (int32_t*)PyArray_DATA(a);
+
+    thread_for(i,nc,{
+	for (long j=0;j<nd;j++) {
+	  d[i*nd+j] = (s[i*nd+j] + shift[j]) % size[j];
+	}
+      });
+    
     return (PyObject*)a;
   });
 

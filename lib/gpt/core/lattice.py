@@ -37,6 +37,7 @@ class lattice_view_constructor:
 
 class lattice(factor):
     __array_priority__ = 1000000
+    cache = {}
 
     def __init__(self, first, second=None, third=None):
         self.metadata = {}
@@ -82,6 +83,12 @@ class lattice(factor):
         del mem_book[self.v_obj[0]]
         for o in self.v_obj:
             cgpt.delete_lattice(o)
+
+    def swap(self, other):
+        assert self.grid == other.grid
+        assert self.otype == other.otype
+        self.v_obj, other.v_obj = other.v_obj, self.v_obj
+        self.metadata, other.metadata = other.metadata, self.metadata
 
     def advise(self, t):
         if type(t) != str:
@@ -131,15 +138,13 @@ class lattice(factor):
 
     def __setitem__(self, key, value):
         # short code path to zero lattice
-        if (
-            type(key) == slice
-            and key == slice(None, None, None)
-            and type(value) == int
-            and value == 0
-        ):
-            for o in self.v_obj:
-                cgpt.lattice_set_to_zero(o)
-            return
+        cache_key = None
+        if type(key) == slice and key == slice(None, None, None):
+            cache_key = f"{self.otype.__name__}_{self.checkerboard().__name__}_{self.grid.describe()}"
+            if type(value) == int and value == 0:
+                for o in self.v_obj:
+                    cgpt.lattice_set_to_zero(o)
+                return
 
         # general code path, map key
         pos, tidx, shape = gpt.map_key(self, key)
@@ -154,25 +159,39 @@ class lattice(factor):
         value = cgpt.copy_cyclic_upscale(value, nbytes_needed)
 
         # create plan
-        plan = gpt.copy_plan(self, value)
-        plan.destination += gpt.lattice_view(self, pos, tidx)
-        plan.source += gpt.global_memory_view(
-            self.grid, [[self.grid.processor, value, 0, value.nbytes]]
-        )
-        xp = plan()
+        if cache_key is None or cache_key not in lattice.cache:
+            plan = gpt.copy_plan(self, value)
+            plan.destination += gpt.lattice_view(self, pos, tidx)
+            plan.source += gpt.global_memory_view(
+                self.grid,
+                [[self.grid.processor, value, 0, value.nbytes]]
+                if value.nbytes > 0
+                else None,
+            )
+
+            # skip optimization if we only use it once
+            xp = plan(
+                local_only=isinstance(pos, gpt.core.local_coordinates),
+                skip_optimize=cache_key is None,
+            )
+            if cache_key is not None:
+                lattice.cache[cache_key] = xp
+        else:
+            xp = lattice.cache[cache_key]
 
         xp(self, value)
 
     def __getitem__(self, key):
         pos, tidx, shape = gpt.map_key(self, key)
 
-        value = numpy.ndarray(
-            (len(pos), *shape), dtype=self.grid.precision.complex_dtype, order="C"
-        )
+        value = cgpt.ndarray((len(pos), *shape), self.grid.precision.complex_dtype)
 
         plan = gpt.copy_plan(value, self)
         plan.destination += gpt.global_memory_view(
-            self.grid, [[self.grid.processor, value, 0, value.nbytes]]
+            self.grid,
+            [[self.grid.processor, value, 0, value.nbytes]]
+            if value.nbytes > 0
+            else None,
         )
         plan.source += gpt.lattice_view(self, pos, tidx)
         xp = plan()

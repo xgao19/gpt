@@ -28,6 +28,7 @@ from gpt.core.gamma import gamma, gamma_base
 from gpt.core.time import time, timer
 from gpt.core.log import message
 from gpt.core.convert import convert
+from gpt.core.cshift_plan import cshift_plan
 from gpt.core.transform import (
     gauge_fix,
     projectSU3,
@@ -42,10 +43,18 @@ from gpt.core.transform import (
     axpy_norm2,
     slice,
     identity,
+    project,
     where,
 )
 from gpt.core.copy_plan import copy_plan, lattice_view, global_memory_view
-from gpt.core.checkerboard import pick_cb, set_cb, even, odd, none, str_to_cb
+from gpt.core.checkerboard import (
+    pick_checkerboard,
+    set_checkerboard,
+    even,
+    odd,
+    none,
+    str_to_cb,
+)
 from gpt.core.operator import *
 from gpt.core.object_type import *
 from gpt.core.mpi import *
@@ -68,7 +77,13 @@ from gpt.core.basis import (
     qr_decomposition,
 )
 from gpt.core.cartesian import cartesian_view
-from gpt.core.coordinates import coordinates, exp_ixp, fft, coordinate_mask
+from gpt.core.coordinates import (
+    coordinates,
+    exp_ixp,
+    fft,
+    coordinate_mask,
+    local_coordinates,
+)
 from gpt.core.random import random, sha256
 from gpt.core.mem import mem_info, mem_report
 from gpt.core.merge import *

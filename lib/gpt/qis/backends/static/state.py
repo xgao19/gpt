@@ -32,7 +32,13 @@ from gpt.qis.map_canonical import map_canonical
 #   cost of bfl?
 class state:
     def __init__(
-        self, rng, number_of_qubits, precision=None, bit_map=None, lattice=None
+        self,
+        rng,
+        number_of_qubits,
+        precision=None,
+        bit_map=None,
+        lattice=None,
+        bit_flipped_plan=None,
     ):
         if precision is None:
             precision = g.double
@@ -42,6 +48,7 @@ class state:
         self.precision = precision
         self.number_of_qubits = number_of_qubits
         self.bit_map = bit_map
+        self.bit_flipped_plan = {} if bit_flipped_plan is None else bit_flipped_plan
         self.classical_bit = [None] * number_of_qubits
         if lattice is not None:
             self.lattice = lattice
@@ -50,6 +57,9 @@ class state:
             self.lattice[:] = 0
             self.lattice[self.bit_map.zero_coordinate] = 1
 
+    def __getitem__(self, idx):
+        return self.lattice[(idx,)]
+
     def cloned(self):
         s = state(
             self.rng,
@@ -57,6 +67,7 @@ class state:
             self.precision,
             self.bit_map,
             g.copy(self.lattice),
+            self.bit_flipped_plan,
         )
         s.classical_bit = [x for x in self.classical_bit]
         return s
@@ -91,7 +102,12 @@ class state:
         c = self.bit_map.coordinates
         nci = self.bit_map.not_coordinates[i]
         bfl = g.lattice(self.lattice)
-        bfl[c] = self.lattice[nci]
+        if i not in self.bit_flipped_plan:
+            p = g.copy_plan(bfl, self.lattice)
+            p.destination += bfl.view[c]
+            p.source += self.lattice.view[nci]
+            self.bit_flipped_plan[i] = p()
+        self.bit_flipped_plan[i](bfl, self.lattice)
         return bfl
 
     def X(self, i):
@@ -121,8 +137,11 @@ class state:
             + self.bit_map.one_mask[control] * bfl
         )
 
+    def probability(self, i):
+        return g.norm2(self.lattice * self.bit_map.one_mask[i])
+
     def measure(self, i):
-        p_one = g.norm2(self.lattice * self.bit_map.one_mask[i])
+        p_one = self.probability(i)
         p_zero = 1.0 - p_one
         l = self.rng.uniform_real()
         if l <= p_one:

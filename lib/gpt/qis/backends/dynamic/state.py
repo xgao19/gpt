@@ -37,6 +37,7 @@ class state:
         lattice=None,
         bit_permutation=None,
         current_coordinates=None,
+        bit_flipped_plan=None,
     ):
         if precision is None:
             precision = g.double
@@ -50,6 +51,7 @@ class state:
         self.number_of_qubits = number_of_qubits
         self.bit_map = bit_map
         self.current_coordinates = current_coordinates
+        self.bit_flipped_plan = {} if bit_flipped_plan is None else bit_flipped_plan
         self.bit_permutation = bit_permutation
         self.classical_bit = [None] * number_of_qubits
         if lattice is not None:
@@ -58,6 +60,12 @@ class state:
             self.lattice = g.complex(self.bit_map.grid)
             self.lattice[:] = 0
             self.lattice[self.bit_map.zero_coordinate] = 1
+
+    def __getitem__(self, idx):
+        coor = self.bit_map.bits_to_index(
+            self.bit_map.index_to_bits(idx, None), self.bit_permutation
+        )
+        return self.lattice[(coor,)]
 
     def cloned(self):
         s = state(
@@ -68,6 +76,7 @@ class state:
             g.copy(self.lattice),
             self.bit_permutation,
             self.current_coordinates,
+            self.bit_flipped_plan,
         )
         s.classical_bit = [x for x in self.classical_bit]
         return s
@@ -86,6 +95,7 @@ class state:
         self.lattice[new_coordinates] = self.lattice[current_coordinates]
         self.bit_permutation = new_permutation
         self.current_coordinates = new_coordinates
+        self.bit_flipped_plan = {}
 
     def randomize(self):
         self.rng.cnormal(self.lattice)
@@ -117,7 +127,15 @@ class state:
         c = self.bit_map.coordinates
         nci = self.bit_map.not_coordinates[self.bit_permutation[i]]
         bfl = g.lattice(self.lattice)
-        bfl[c] = self.lattice[nci]
+        if i not in self.bit_flipped_plan:
+            p = g.copy_plan(bfl, self.lattice)
+            p.destination += bfl.view[c]
+            p.source += self.lattice.view[nci]
+            self.bit_flipped_plan[i] = p()
+            # g.message(
+            #     self.bit_flipped_plan[i].info()
+            # )  # TODO: it is odd that this maxes out at 22 GB/s ; focus on bandwidth benchmark first, why 500GB/s for prop and only 5 for singlet?
+        self.bit_flipped_plan[i](bfl, self.lattice)
         return bfl
 
     def X(self, i):
@@ -138,6 +156,9 @@ class state:
         bfl_one = self.bit_map.zero_mask[self.bit_permutation[i]] * bfl
         nrm = 1.0 / 2.0 ** 0.5
         self.lattice @= nrm * (zero + bfl_zero) + nrm * (bfl_one - one)
+        # TODO: create a cgpt function
+        # cgpt.local_linear_combination taking instead of a list of coefficients a list of complex lattices
+        # then add both linear combination and this local_linear_combination to the benchmarking suite
 
     def CNOT(self, control, target):
         assert control != target
@@ -147,8 +168,11 @@ class state:
             + self.bit_map.one_mask[self.bit_permutation[control]] * bfl
         )
 
+    def probability(self, i):
+        return g.norm2(self.lattice * self.bit_map.one_mask[self.bit_permutation[i]])
+
     def measure(self, i):
-        p_one = g.norm2(self.lattice * self.bit_map.one_mask[self.bit_permutation[i]])
+        p_one = self.probability(i)
         p_zero = 1.0 - p_one
         l = self.rng.uniform_real()
         if l <= p_one:
