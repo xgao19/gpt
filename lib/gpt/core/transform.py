@@ -67,7 +67,7 @@ def projectSU3(first, second):
     else:
         print("Type error in projectSU3")
     for i in l.otype.v_idx:
-        cgpt.Projectnew(l.v_obj[i], m.v_obj[i])
+        cgpt.ProjectSU3(l.v_obj[i], m.v_obj[i])
 
 def cshift(first, second, third, fourth=None):
 

@@ -111,7 +111,7 @@ def hyp(U, params):
 
     ftmp = alpha[0]/6.0/(1.0-alpha[0])
 
-    U_hyp = {}
+    U_hyp = []
 
     for mu in range(4):
         g.copy(Y, U[mu])
@@ -129,7 +129,7 @@ def hyp(U, params):
         X = g.eval(g.adj(U[mu] + ftmp * staple))
         g.projectSU3(X, Y)
 
-        U_hyp[mu] = g.lattice(U[0])
+        U_hyp.append(g.lattice(U[0]))
         g.copy(U_hyp[mu], Y)
 
     
