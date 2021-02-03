@@ -11,14 +11,14 @@ function check_package {
 	fi
 }
 
-check_package gcc
-check_package python3
-check_package python3-pip
-check_package wget
-check_package autoconf
-check_package libssl-dev
-check_package zlib1g-dev
-check_package libfftw3-dev
+#check_package gcc
+#check_package python3
+#check_package python3-pip
+#check_package wget
+#check_package autoconf
+#check_package libssl-dev
+#check_package zlib1g-dev
+#check_package libfftw3-dev
 
 #
 # Install python3 if it is not yet there
@@ -50,11 +50,11 @@ dep=${root}/dependencies
 if [ ! -f ${dep}/Grid/build/Grid/libGrid.a ];
 then
 
-	if [ -d ${dep} ];
-	then
-	    echo "$dep already exists ; rm -rf $dep before bootstrapping again"
-	    exit 1
-	fi
+	#if [ -d ${dep} ];
+	#then
+	#    echo "$dep already exists ; rm -rf $dep before bootstrapping again"
+	#    exit 1
+	#fi
 
 	mkdir -p ${dep}
 	cd ${dep}
@@ -62,26 +62,26 @@ then
 	#
 	# Lime
 	#
-	wget https://github.com/usqcd-software/c-lime/tarball/master
-	tar xzf master
-	mv usqcd-software-c-lime* lime
-	rm -f master
-	cd lime
-	./autogen.sh
-	./configure
-	make
-	cd ..
+	# wget https://github.com/usqcd-software/c-lime/tarball/master
+	# tar xzf master
+	# mv usqcd-software-c-lime* lime
+	# rm -f master
+	# cd lime
+	# ./autogen.sh
+	# ./configure
+	# make
+	# cd ..
 
 	#
 	# Grid
 	#
-	git clone https://github.com/lehner/Grid.git
+	#git clone https://github.com/lehner/Grid.git
 	cd Grid
 	git checkout feature/gpt
 	./bootstrap.sh
 	mkdir build
 	cd build
-	../configure --enable-precision=double --enable-simd=AVX2 --enable-comms=none CXXFLAGS=-fPIC --with-lime=${dep}/lime
+	../configure --enable-precision=double --enable-simd=AVX2 --enable-comms=mpi-auto CXXFLAGS=-fPIC --with-lime=${dep}/lime
 	cd Grid
 	make -j 4
 fi
