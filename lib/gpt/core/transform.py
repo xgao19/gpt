@@ -18,6 +18,56 @@
 #
 import cgpt, gpt, numpy
 
+def gauge_fix(first):
+    params = {
+            "U_grid": first[0].grid.obj,
+            "U": [u.v_obj[0] for u in first],
+        }
+    r, f = cgpt.Gauge_fix(params)
+
+    # for gr in r:
+    #     print("HALLO")
+    #     print(gr)
+    result=[]
+    for gr in r:
+        # grid = gpt.grid(
+        #     gr[1], eval("gpt.precision." + gr[2]), eval("gpt." + gr[3]), gr[0]
+        # )
+        result_grid = []
+        otype = gpt.ot_matrix_su_n_fundamental_group(3)
+        for t_obj, s_ot, s_pr in gr[4]:
+            assert s_pr == gr[2]
+
+            # only allow loading su3 gauge fields from cgpt, rest done in python
+            # in the long run, replace *any* IO from cgpt with gpt code
+            assert s_ot == "ot_mcolor3"
+            l = gpt.lattice(first[0].grid, otype, [t_obj])
+
+            # l.metadata = metadata
+            result_grid.append(l)
+        result.append(result_grid)
+    while len(result) == 1:
+        result = result[0]
+    fix = gpt.lattice(first[0], gpt.ot_matrix_su_n_fundamental_group(3),[f[0]])
+
+    return result, fix
+
+def projectStout(first):
+    if(type(first)==gpt.lattice):
+        l = gpt.eval(first)
+    else:
+        print("Type error in projectStout")
+    for i in l.otype.v_idx:
+        cgpt.ProjectStout(l.v_obj[i])
+
+def projectSU3(first, second):
+    if(type(first)==gpt.lattice and type(second)==gpt.lattice):
+        l = gpt.eval(first)
+        m = gpt.eval(second)
+    else:
+        print("Type error in projectSU3")
+    for i in l.otype.v_idx:
+        cgpt.ProjectSU3(l.v_obj[i], m.v_obj[i])
 
 def cshift(first, second, third, fourth=None):
 
