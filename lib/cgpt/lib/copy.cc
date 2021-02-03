@@ -122,15 +122,15 @@ EXPORT(copy_get_plan_info,{
 
     PyObject* ret = PyDict_New();
     for (auto & rank : plan->blocks) {
-      auto rank_dst = rank.first.first;
-      auto rank_src = rank.first.second;
+      auto rank_dst = rank.first.dst_rank;
+      auto rank_src = rank.first.src_rank;
 
       PyObject* ret_rank = PyDict_New();
       for (auto & index : rank.second) {
-	auto index_dst = index.first.first;
-	auto index_src = index.first.second;
-	size_t blocks = index.second.second.size();
-	size_t size = index.second.first * blocks;
+	auto index_dst = index.first.dst_index;
+	auto index_src = index.first.src_index;
+	size_t blocks = index.second.size();
+	size_t size = plan->block_size * blocks;
 
 	PyObject* data = PyDict_New();
 	PyDict_SetItemString(data,"blocks",PyLong_FromLong((long)blocks));
@@ -265,7 +265,8 @@ EXPORT(copy_create_view,{
     get_block_size.nb = nb;
 
     long block_size = cgpt_reduce(get_block_size, cgpt_gcd, nb ? get_block_size[0] : 1);
-    ASSERT(block_size);
+    if (!block_size)
+      block_size = sizeof(vComplexF);
 
     v->view.block_size = block_size;
 
