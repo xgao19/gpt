@@ -292,15 +292,19 @@ EXPORT(coordinates_momentum_phase,{
 
 EXPORT(coordinates_momentum_gauss,{
 
-    // exp(i x mom)
-    PyObject* _coordinates, * _param, * _prec;
-    if (!PyArg_ParseTuple(args, "OOO", &_coordinates,&_param,&_prec)) {
+    // exp(- 1/2 w ^2 (mom-k)^2)
+    PyObject* _coordinates, * _param, * _k, * _L, * _prec;
+    if (!PyArg_ParseTuple(args, "OOOOO", &_coordinates,&_param, &_k, &_L, &_prec)) {
       return NULL;
     }
 
     std::vector<ComplexD> param;
+    std::vector<RealD> k;
+    std::vector<int> L;
     std::string prec;
     cgpt_convert(_param,param);
+    cgpt_convert(_k,k);
+    cgpt_convert(_L,L);
     cgpt_convert(_prec,prec);
     int dtype = infer_numpy_type(prec);
     
@@ -314,6 +318,8 @@ EXPORT(coordinates_momentum_gauss,{
     int32_t* s = (int32_t*)PyArray_DATA(coordinates);
     // ASSERT(nd == mom.size());
     ASSERT((nd -1) == param.size());
+    ASSERT((nd -1) == k.size());
+    ASSERT((nd -1) == L.size());
 
     std::vector<long> dims(2);
     dims[0]=nc;
@@ -329,9 +335,9 @@ EXPORT(coordinates_momentum_gauss,{
     // ComplexD x = 0.0;
 
 	  for (j=0;j<nd-1;j++) {
-      RealD x = s[i*nd+j];
+      RealF x = fmod(s[i*nd+j]-k[j], L[j]); // Always inside Brillouin Zone
 	    // x += (ComplexD)(-1.0*s[i*nd+j]*s[i*nd+j]*4.0*pi*pi*param);
-	    arg+= x * x * (ComplexD)param[j];
+	    arg+= x * x * (ComplexF)param[j];
 	  }
 	  d[i] = exp(arg);
 	});
@@ -345,7 +351,7 @@ EXPORT(coordinates_momentum_gauss,{
 	  ComplexD arg = 0.0;
     // ComplexD x = 0.0;
 	  for (j=0;j<nd-1;j++) {
-      RealD x = s[i*nd+j];
+      RealD x = fmod(s[i*nd+j]-k[j], L[j]); // Always inside Brillouin Zone
 	    // x += (ComplexD)(-1.0*s[i*nd+j]*s[i*nd+j]*4.0*pi*pi*param);
 	    arg+= x * x * (ComplexD)param[j];
 	  }

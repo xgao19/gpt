@@ -28,7 +28,8 @@ EXPORT(Gauge_fix,{
     Real alpha=0.1;
     LatticeColourMatrixD xform1(grid);
 
-    FourierAcceleratedGaugeFixer<PeriodicGimplR>::SteepestDescentGaugeFix(U,xform1,alpha,10000,1.0e-12, 1.0e-12,false);
+    //This fixes to Coulomb gauge with orthogonal dir = last param! Set to -1 or dont set for Landau gauge 
+    FourierAcceleratedGaugeFixer<PeriodicGimplR>::SteepestDescentGaugeFix(U,xform1,alpha,10000,1.0e-12, 1.0e-12,true,3);
 
 
     // Transfrom back to stuff that gpt can deal with

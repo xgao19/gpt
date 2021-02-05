@@ -59,8 +59,8 @@ def apply_exp_ixp(dst, src, p):
     phase[x] = cgpt.coordinates_momentum_phase(x, p, src.grid.precision)
     dst @= phase * src
 
-def apply_exp_p2(dst, src, w):
-    x = gpt.coordinates(src)
+def apply_exp_p2(dst, src, w, k):
+    p = gpt.coordinates(src)
 
     dim = src.grid.fdimensions
 
@@ -71,11 +71,11 @@ def apply_exp_p2(dst, src, w):
 
     # param = -2.0 * numpy.pi * w * numpy.pi * w/ dim[0:3] / dim[0:3]
 
-    # print(param)
+    # print(dim[0:3])
 
     gauss = gpt.complex(src.grid)
     gauss.checkerboard(src.checkerboard())
-    gauss[x] = cgpt.coordinates_momentum_gauss(x, param , src.grid.precision)
+    gauss[p] = cgpt.coordinates_momentum_gauss(p, param, k, dim[0:3], src.grid.precision)
     dst @= gauss * src
 
 

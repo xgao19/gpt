@@ -112,9 +112,11 @@ with open("pre.txt", "w") as f:
 
 g.message("Output 1 complete")
 
+#do fft for dims 0,1,2
 fft =g.eval(g.fft([0,1,2])*gf_src)
 
-g.apply_exp_p2(dst, fft, 2.0)
+# multiply with shifted gaussian in mom. space. Parameters: destination, source, "width", boost 
+g.apply_exp_p2(dst, fft, 2.0, [0.0,0.0,1.0])
 
 back = g.eval(g.adj(g.fft([0,1,2]))*dst)
 
