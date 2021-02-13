@@ -28,7 +28,7 @@ EXPORT(Gauge_fix,{
     Real alpha=0.1;
     LatticeColourMatrixD xform1(grid);
 
-    FourierAcceleratedGaugeFixer<PeriodicGimplR>::SteepestDescentGaugeFix(U,xform1,alpha,10000,1.0e-12, 1.0e-12,false);
+    FourierAcceleratedGaugeFixer<PeriodicGimplR>::SteepestDescentGaugeFix(U,xform1,alpha,10000,1.0e-12, 1.0e-12,true,3);
 
 
     // Transfrom back to stuff that gpt can deal with

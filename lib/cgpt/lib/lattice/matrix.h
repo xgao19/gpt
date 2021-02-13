@@ -45,3 +45,9 @@ void cgpt_determinant(Lattice<T>& l, cgpt_Lattice_base* _det, std::vector<cgpt_L
 
   determinant(det, matrix, n_virtual);
 }
+
+template<typename T>
+void cgpt_ProjectSU3(Lattice<T>& l) {
+  projection(l);
+
+}
