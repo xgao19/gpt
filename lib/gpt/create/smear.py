@@ -55,3 +55,19 @@ def gauss(U, params):
             dst += (sigma * sigma / (4.0 * steps)) * lap * dst
 
     return g.matrix_operator(mat=mat)
+
+@params_convention(params=None)
+def boosted_smearing(U_trafo, src, params):
+    w = params["w"]
+    boost = params["boost"]
+    dst = g.mspincolor(U_trafo.grid)
+    #source in fixed gauge
+    gf_src = g.eval(U_trafo*src)
+    #do fft for dims 0,1,2
+    fft =g.eval(g.fft([0,1,2])*gf_src)
+    # multiply with shifted gaussian in mom. space. Parameters: destination, source, "width", boost 
+    g.apply_exp_p2(dst, fft, w, boost)
+    #inverse fft to position space
+    back = g.eval(g.adj(g.fft([0,1,2]))*dst)
+    #multiply boosted source with Omega^dagger
+    return g.eval(g.adj(U_trafo)*back)
