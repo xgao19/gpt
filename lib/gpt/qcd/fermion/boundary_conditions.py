@@ -17,17 +17,16 @@
 #    with this program; if not, write to the Free Software Foundation, Inc.,
 #    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 #
-from gpt.algorithms.inverter.sequence import sequence
-from gpt.algorithms.inverter.deflate import deflate
-from gpt.algorithms.inverter.coarse_deflate import coarse_deflate
-from gpt.algorithms.inverter.cg import cg
-from gpt.algorithms.inverter.bicgstab import bicgstab
-from gpt.algorithms.inverter.fgcr import fgcr
-from gpt.algorithms.inverter.fgmres import fgmres
-from gpt.algorithms.inverter.mr import mr
-from gpt.algorithms.inverter.defect_correcting import defect_correcting
-from gpt.algorithms.inverter.mixed_precision import mixed_precision
-from gpt.algorithms.inverter.split import split
-from gpt.algorithms.inverter.preconditioned import preconditioned
-from gpt.algorithms.inverter.multi_grid import multi_grid, multi_grid_setup
-from gpt.algorithms.inverter.calculate_residual import calculate_residual
+import gpt
+
+
+def apply_open_boundaries(field):
+    if type(field) == list:
+        return [apply_open_boundaries(x) for x in field]
+
+    assert type(field) == gpt.lattice
+    T = field.grid.fdimensions[3]
+    field[:, :, :, 0] = 0.0
+    field[:, :, :, T - 1] = 0.0
+    return field
+    # TODO create plan and cache it
