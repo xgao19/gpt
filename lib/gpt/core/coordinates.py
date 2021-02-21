@@ -64,7 +64,7 @@ def apply_exp_p2(dst, src, w, k):
 
     dim = src.grid.fdimensions
 
-    #this does the -1/2 * 4*pi^2/L^2 k, so that we actually to exp(-1/2 w^2(\vec p)^2)
+    #this does -1/2 * 4*pi^2/L^2 w^2, so that we actually to exp(-1/2 w^2(\vec p)^2)
     param=[]
     for i in range(3):
         param.append(-2.0 * numpy.pi * w * numpy.pi * w/ dim[i] / dim[i])
@@ -77,6 +77,40 @@ def apply_exp_p2(dst, src, w, k):
     gauss.checkerboard(src.checkerboard())
     gauss[p] = cgpt.coordinates_momentum_gauss(p, param, k, dim[0:3], src.grid.precision)
     dst @= gauss * src
+
+def apply_1S(dst, src, w):
+    #this does a convolution of the source with the kernel exp(-1/(2w^2)x^2) by FFT
+    x = gpt.coordinates(src)
+
+    dim = src.grid.fdimensions
+
+    smear = gpt.complex(src.grid)
+    smear.checkerboard(src.checkerboard())
+    smear[x] = cgpt.coordinates_gauss(x, w, dim[0:3], src.grid.precision)
+
+    fft_smear = gpt.eval(gpt.fft([0,1,2])*smear)
+
+    dst @= fft_smear * src
+
+def apply_2S(dst, src, w, b):
+    #this does a convolution of the source with the kernel (1-b*x^2)exp(-1/(2w^2)x^2) by FFT
+    x = gpt.coordinates(src)
+
+    dim = src.grid.fdimensions
+
+    smear = gpt.complex(src.grid)
+    smear.checkerboard(src.checkerboard())
+    smear[x] = cgpt.coordinates_2S(x, w, b, dim[0:3], src.grid.precision)
+    
+    # with open("OneS_xy.txt", "w") as f:
+    #     for i in x:
+    #         if (i[2]==0 and i[3]==0):
+    #             f.write(f"{i[0]} \t {i[1]} \t {i[2]} \t {i[3]} \t {smear[int(i[0]),int(i[1]),int(i[2]),int(i[3]),1,1,1,1][0,0,0,0,0].real} \n")
+ 
+
+    fft_smear = gpt.eval(gpt.fft([0,1,2])*smear)
+
+    dst @= fft_smear * src
 
 
 def exp_ixp(p):

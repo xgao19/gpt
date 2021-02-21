@@ -8,9 +8,9 @@ import gpt as g
 import numpy as np
 
 # load configuration
-# rng = g.random("test")
-# U = g.qcd.gauge.random(g.grid([16, 16, 16, 4], g.double), rng)
-U = g.load("/home/scior/converter/l6464f21b7130m00119m0322a.1056.nersc")
+rng = g.random("test")
+U = g.qcd.gauge.random(g.grid([16, 16, 16, 16], g.double), rng)
+#U = g.load("/home/scior/converter/l6464f21b7130m00119m0322a.1056.nersc")
 # V = rng.element(g.lattice(U[0]))
 # U_transformed = g.qcd.gauge.transformed(U, V)
 
@@ -59,7 +59,7 @@ U = g.load("/home/scior/converter/l6464f21b7130m00119m0322a.1056.nersc")
 # U_hyp = U
 # P_hyp = []
 # for i in range(3):
-U_hyp = g.qcd.gauge.smear.hyp(U, alpha = np.array([0.1, 0.2, 0.3]))
+#U_hyp = g.qcd.gauge.smear.hyp(U, alpha = np.array([0.1, 0.2, 0.3]))
 
 #     for mu in range(len(U_hyp)):
 #         I = g.identity(U_hyp[mu])
@@ -71,7 +71,7 @@ U_hyp = g.qcd.gauge.smear.hyp(U, alpha = np.array([0.1, 0.2, 0.3]))
 # g.message(f"Hyp smeared plaquettes {P_hyp}")
 # assert sorted(P_hyp) == P_hyp  # make sure plaquettes go towards one
 
-U_prime, trafo = g.gauge_fix(U_hyp)
+U_prime, trafo = g.gauge_fix(U)
 
 # # print(U)
 # # print(U_prime)
@@ -85,21 +85,22 @@ U_prime, trafo = g.gauge_fix(U_hyp)
 
 # g.message(f"avg. Determinat of gauge trafo matrices; {k}")
 
-# src = g.mspincolor(U[0].grid)
-# g.create.point(src, [0, 8, 0, 0])
+src = g.mspincolor(U[0].grid)
+g.create.point(src, [0, 8, 0, 0])
 
 # # dst = g.mspincolor(U[0].grid)
 
 
 # # # print(dst)
-# coord = g.coordinates(U[0].grid)
+coord = g.coordinates(U[0].grid)
 
 # # #make the gauge fixed src
 # gf_src = g.eval(trafo*src)
 
-# test = g.complex(U[0].grid)
 
-# test[:] = gf_src[:,:,:,:,1,1,1,1]
+# make wall src
+
+# test[:] = wall[:,:,:,:,1,1,1,1]
 # print(gf_src[0,0,0,0,1,1,1,1][0,0,0,0,0])
 
 # print(test[0,0,0,0])
@@ -109,10 +110,13 @@ U_prime, trafo = g.gauge_fix(U_hyp)
 #     for x in coord:
 #         # tmp = test[x[0,x[1],x]]
 #         # print(f"{x[0]} \t {x[1]} \t {x[2]} \t {x[3]} \t {test[1,2,3,4]}\n")
-#         f.write(f"{x[0]} \t {x[1]} \t {x[2]} \t {x[3]} \t {np.abs(gf_src[int(x[0]),int(x[1]),int(x[2]),int(x[3]),1,1,1,1][0,0,0,0,0])} \n")
+#         f.write(f"{x[0]} \t {x[1]} \t {x[2]} \t {x[3]} \t {np.abs(src[int(x[0]),int(x[1]),int(x[2]),int(x[3]),1,1,1,1][0,0,0,0,0])} \n")
 
 # g.message("Output 1 complete")
 
+OneS = g.create.smear.OneS_smearing(trafo, src, w=1.0)
+
+TwoS = g.create.smear.TwoS_smearing(trafo, src, w=1.0, b=1.0)
 # interm = g.create.smear.boosted_smearing(trafo, src, w=1.0, boost=[0.0,0.0,2.0])
 
 # back = g.create.smear.boosted_smearing(trafo, interm, w=1.0, boost=[0.0,0.0,-2.0])
@@ -125,9 +129,18 @@ U_prime, trafo = g.gauge_fix(U_hyp)
 
 # # back = g.eval(g.adj(g.fft([0,1,2]))*dst)
 
-# with open("aft.txt", "w") as f:
-#     for x in coord:
-#         f.write(f"{x[0]} \t {x[1]} \t {x[2]} \t {x[3]} \t {np.abs(back[int(x[0]),int(x[1]),int(x[2]),int(x[3]),1,1,1,1][0,0,0,0,0])} \n")
+with open("OneS_xy.txt", "w") as f:
+    for x in coord:
+        if (x[2]==0 and x[3]==0):
+            f.write(f"{x[0]} \t {x[1]} \t {x[2]} \t {x[3]} \t {np.abs(OneS[int(x[0]),int(x[1]),int(x[2]),int(x[3]),1,1,1,1][0,0,0,0,0])} \n")
+
+g.message("Output 2 complete")
+
+with open("TwoS_xy.txt", "w") as f:
+    for x in coord:
+        if (x[2]==0 and x[3]==0):
+            f.write(f"{x[0]} \t {x[1]} \t {x[2]} \t {x[3]} \t {TwoS[int(x[0]),int(x[1]),int(x[2]),int(x[3]),1,1,1,1][0,0,0,0,0].real} \n")
+
 
 # momenta_sq = g.complex(U[0].grid)
 # gaussian = g.complex(U[0].grid)

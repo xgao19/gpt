@@ -71,3 +71,37 @@ def boosted_smearing(U_trafo, src, params):
     back = g.eval(g.adj(g.fft([0,1,2]))*dst)
     #multiply boosted source with Omega^dagger
     return g.eval(g.adj(U_trafo)*back)
+
+@params_convention(params=None)
+def OneS_smearing(U_trafo, src, params):
+    w = params["w"]
+    boost = [0,0,0]
+    dst = g.mspincolor(U_trafo.grid)
+    #source in fixed gauge
+    gf_src = g.eval(U_trafo*src)
+    #do fft for dims 0,1,2
+    fft =g.eval(g.fft([0,1,2])*gf_src)
+    # multiply with gaussian in mom. space
+    g.apply_1S(dst, fft, w)
+    #inverse fft to position space
+    back = g.eval(g.adj(g.fft([0,1,2]))*dst)
+    #multiply boosted source with Omega^dagger
+    return g.eval(g.adj(U_trafo)*back)
+
+@params_convention(params=None)
+def TwoS_smearing(U_trafo, src, params):
+    w = params["w"]
+    b = params["b"]
+    dst = g.mspincolor(U_trafo.grid)
+    #source in fixed gauge
+    gf_src = g.eval(U_trafo*src)
+    #do fft for dims 0,1,2
+    fft =g.eval(g.fft([0,1,2])*gf_src)
+    # multiply with smearing Kernel in mom. space
+    g.apply_2S(dst, fft, w, b)
+    #inverse fft to position space
+    back = g.eval(g.adj(g.fft([0,1,2]))*dst)
+    #multiply boosted source with Omega^dagger
+    return g.eval(g.adj(U_trafo)*back)
+
+    return g.eval(g.adj(U_trafo)*dst)

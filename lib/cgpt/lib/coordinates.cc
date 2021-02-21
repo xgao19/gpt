@@ -328,10 +328,10 @@ EXPORT(coordinates_momentum_gauss,{
     if (dtype == NPY_COMPLEX64) {
       ComplexF* d = (ComplexF*)PyArray_DATA(a);
 
-    RealF pi = 3.141;
+    RealF pi = 3.14159265;
       thread_for(i,nc,{
 	  long j;
-	  ComplexD arg = 0.0;
+	  ComplexF arg = 0.0;
     // ComplexD x = 0.0;
 
 	  for (j=0;j<nd-1;j++) {
@@ -361,6 +361,141 @@ EXPORT(coordinates_momentum_gauss,{
 
     return (PyObject*)a;
   });
+
+  EXPORT(coordinates_gauss,{
+
+    // symmetrized form of exp(- 1/2 w ^2 (x)^2)
+    PyObject* _coordinates,* _w, * _L, * _prec;
+    if (!PyArg_ParseTuple(args, "OOOO", &_coordinates, &_w, &_L, &_prec)) {
+      return NULL;
+    }
+
+    RealD w;
+    std::vector<int> L;
+    std::string prec;
+    cgpt_convert(_w,w);
+    cgpt_convert(_L,L);
+    cgpt_convert(_prec,prec);
+    int dtype = infer_numpy_type(prec);
+    
+    ASSERT(cgpt_PyArray_Check(_coordinates));
+    PyArrayObject* coordinates = (PyArrayObject*)_coordinates;
+    ASSERT(PyArray_TYPE(coordinates)==NPY_INT32);
+    ASSERT(PyArray_NDIM(coordinates) == 2);
+    long* tdim = PyArray_DIMS(coordinates);
+    long nc    = tdim[0];
+    long nd    = tdim[1];
+    int32_t* s = (int32_t*)PyArray_DATA(coordinates);
+    ASSERT((nd -1) == L.size());
+
+    std::vector<long> dims(2);
+    dims[0]=nc;
+    dims[1]=1;
+    PyArrayObject* a = cgpt_new_PyArray((int)dims.size(),&dims[0],dtype);
+    if (dtype == NPY_COMPLEX64) {
+      ComplexF* d = (ComplexF*)PyArray_DATA(a);
+
+      thread_for(i,nc,{
+	  long j;
+	  ComplexF arg = 0.0;
+
+	  for (j=0;j<nd-1;j++) {
+      RealF x = (s[i*nd+j] + L[j]/2)%L[j] - L[j]/2;
+	    arg+=  x * x * (ComplexF)(-0.5/ (w*w));
+	  }
+	  d[i] = exp(arg);
+	});
+
+    } else if (dtype == NPY_COMPLEX128) {
+      ComplexD* d = (ComplexD*)PyArray_DATA(a);
+      RealD pi = 3.141;
+
+      thread_for(i,nc,{
+	  long j;
+	  ComplexD arg = 0.0;
+
+	  for (j=0;j<nd-1;j++) {
+      RealD x = (s[i*nd+j] + L[j]/2)%L[j] - L[j]/2;
+	    arg+=  x * x * (ComplexD)(-0.5/ (w*w));
+	  }
+	  d[i] = exp(arg);
+	});
+    }
+
+    return (PyObject*)a;
+  });
+
+EXPORT(coordinates_2S,{
+
+    /// symmetrized form of (1- bx^2) exp(- 1/2 w ^2 (x)^2)
+
+    PyObject* _coordinates, * _w, * _b, * _L, * _prec;
+    if (!PyArg_ParseTuple(args, "OOOOO", &_coordinates, &_w, &_b, &_L, &_prec)) {
+      return NULL;
+    }
+
+    std::vector<int> L;
+    RealD w;
+    RealD b;
+    std::string prec;
+    cgpt_convert(_L,L);
+    cgpt_convert(_w,w);
+    cgpt_convert(_b,b);
+    cgpt_convert(_prec,prec);
+    int dtype = infer_numpy_type(prec);
+    
+    ASSERT(cgpt_PyArray_Check(_coordinates));
+    PyArrayObject* coordinates = (PyArrayObject*)_coordinates;
+    ASSERT(PyArray_TYPE(coordinates)==NPY_INT32);
+    ASSERT(PyArray_NDIM(coordinates) == 2);
+    long* tdim = PyArray_DIMS(coordinates);
+    long nc    = tdim[0];
+    long nd    = tdim[1];
+    int32_t* s = (int32_t*)PyArray_DATA(coordinates);
+    ASSERT((nd -1) == L.size());
+
+    std::vector<long> dims(2);
+    dims[0]=nc;
+    dims[1]=1;
+    PyArrayObject* a = cgpt_new_PyArray((int)dims.size(),&dims[0],dtype);
+    if (dtype == NPY_COMPLEX64) {
+      ComplexF* d = (ComplexF*)PyArray_DATA(a);
+
+      thread_for(i,nc,{
+	  long j;
+	  ComplexF arg = 0.0;
+    ComplexF pre = 1.0;
+
+	  for (j=0;j<nd-1;j++) {
+      RealF x = (s[i*nd+j] + L[j]/2)%L[j] - L[j]/2;
+	    arg+=  x * x * (ComplexF)(-0.5/ (w*w));
+      pre+= x * x * (ComplexF)(-1.0*b) ;
+	  }
+	  d[i] = pre*exp(arg);
+	});
+
+    } else if (dtype == NPY_COMPLEX128) {
+      ComplexD* d = (ComplexD*)PyArray_DATA(a);
+      RealD pi = 3.141;
+
+      thread_for(i,nc,{
+	  long j;
+	  ComplexD arg = 0.0;
+    ComplexD pre = 1.0;
+    // ComplexD x = 0.0;
+	  for (j=0;j<nd-1;j++) {
+      RealD x = (s[i*nd+j] + L[j]/2)%L[j] - L[j]/2;
+	    arg+=  x * x * (ComplexD)(-0.5/ (w*w));
+      pre+= x * x * (ComplexD)(-1.0*b) ;
+
+	  }
+	  d[i] = pre*exp(arg);
+	});
+    }
+
+    return (PyObject*)a;
+  });
+
 
 EXPORT(coordinates_shift,{
 
