@@ -9,7 +9,7 @@ import numpy as np
 
 # load configuration
 rng = g.random("test")
-U = g.qcd.gauge.random(g.grid([16, 16, 16, 16], g.double), rng)
+U = g.qcd.gauge.random(g.grid([8, 8, 8, 8], g.double), rng)
 #U = g.load("/home/scior/converter/l6464f21b7130m00119m0322a.1056.nersc")
 # V = rng.element(g.lattice(U[0]))
 # U_transformed = g.qcd.gauge.transformed(U, V)
@@ -86,7 +86,7 @@ U_prime, trafo = g.gauge_fix(U)
 # g.message(f"avg. Determinat of gauge trafo matrices; {k}")
 
 src = g.mspincolor(U[0].grid)
-g.create.point(src, [0, 8, 0, 0])
+g.create.point(src, [0, 4, 0, 0])
 
 # # dst = g.mspincolor(U[0].grid)
 
