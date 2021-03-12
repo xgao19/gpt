@@ -66,7 +66,7 @@ def boosted_smearing(U_trafo, src, params):
     #do fft for dims 0,1,2
     fft =g.eval(g.fft([0,1,2])*gf_src)
     # multiply with shifted gaussian in mom. space. Parameters: destination, source, "width", boost 
-    g.apply_exp_p2(dst, fft, w, boost)
+    g.apply_boosted_1S(dst, fft, w, boost)
     #inverse fft to position space
     back = g.eval(g.adj(g.fft([0,1,2]))*dst)
     #multiply boosted source with Omega^dagger
@@ -104,4 +104,3 @@ def TwoS_smearing(U_trafo, src, params):
     #multiply boosted source with Omega^dagger
     return g.eval(g.adj(U_trafo)*back)
 
-    return g.eval(g.adj(U_trafo)*dst)

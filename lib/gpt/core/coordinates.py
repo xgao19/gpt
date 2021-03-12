@@ -59,24 +59,19 @@ def apply_exp_ixp(dst, src, p):
     phase[x] = cgpt.coordinates_momentum_phase(x, p, src.grid.precision)
     dst @= phase * src
 
-def apply_exp_p2(dst, src, w, k):
-    p = gpt.coordinates(src)
+def apply_boosted_1S(dst, src, w, k):
+    #this does a convolution of the source with the kernel exp(-1/(2w^2)x^2) * exp(-ikx) by FFT
+    x = gpt.coordinates(src)
 
     dim = src.grid.fdimensions
 
-    #this does -1/2 * 4*pi^2/L^2 w^2, so that we actually to exp(-1/2 w^2(\vec p)^2)
-    param=[]
-    for i in range(3):
-        param.append(-2.0 * numpy.pi * w * numpy.pi * w/ dim[i] / dim[i])
+    smear = gpt.complex(src.grid)
+    smear.checkerboard(src.checkerboard())
+    smear[x] = cgpt.coordinates_gauss(x, w, dim[0:3], k, src.grid.precision)
 
-    # param = -2.0 * numpy.pi * w * numpy.pi * w/ dim[0:3] / dim[0:3]
+    fft_smear = gpt.eval(gpt.fft([0,1,2])*smear)
 
-    # print(dim[0:3])
-
-    gauss = gpt.complex(src.grid)
-    gauss.checkerboard(src.checkerboard())
-    gauss[p] = cgpt.coordinates_momentum_gauss(p, param, k, dim[0:3], src.grid.precision)
-    dst @= gauss * src
+    dst @= fft_smear * src
 
 def apply_1S(dst, src, w):
     #this does a convolution of the source with the kernel exp(-1/(2w^2)x^2) by FFT
@@ -86,7 +81,7 @@ def apply_1S(dst, src, w):
 
     smear = gpt.complex(src.grid)
     smear.checkerboard(src.checkerboard())
-    smear[x] = cgpt.coordinates_gauss(x, w, dim[0:3], src.grid.precision)
+    smear[x] = cgpt.coordinates_gauss(x, w, dim[0:3], [0,0,0], src.grid.precision)
 
     fft_smear = gpt.eval(gpt.fft([0,1,2])*smear)
 

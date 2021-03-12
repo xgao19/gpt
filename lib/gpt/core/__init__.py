@@ -86,7 +86,7 @@ from gpt.core.coordinates import (
     fft,
     coordinate_mask,
     local_coordinates,
-    apply_exp_p2,
+    apply_boosted_1S,
     apply_1S,
     apply_2S,
 )
