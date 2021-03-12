@@ -99,5 +99,3 @@ import gpt.core.util
 import gpt.core.block
 import gpt.core.matrix
 import gpt.core.component
-import gpt.core.coarse
-from gpt.core.matrix import det
