@@ -19,6 +19,14 @@ rng = g.random("test")
 l_dp = rng.cnormal(g.vcolor(grid_dp))
 l_sp = g.convert(l_dp, g.single)
 
+# and convert precision
+l_dp_prime = g.convert(l_sp, g.double)
+eps2 = g.norm2(l_dp - l_dp_prime) / g.norm2(l_dp)
+assert eps2 < 1e-14
+eps2 = g.norm2(l_dp[0, 0, 0, 0] - l_sp[0, 0, 0, 0])
+assert eps2 < 1e-14
+
+
 ################################################################################
 # Test mview
 ################################################################################
@@ -282,6 +290,7 @@ for grid in [grid_sp, grid_dp]:
 ################################################################################
 # Test where
 ################################################################################
+grid = grid_dp
 sel = g.complex(grid)
 rng.uniform_int(sel, min=0, max=1)
 
@@ -315,6 +324,26 @@ assert eps == 0.0
 eps = g.norm2((b < a) - (a > b)) ** 0.5
 g.message(f"Test a < b compatible with b > a: {eps}")
 assert eps == 0.0
+
+################################################################################
+# Test basis rotate against linear combination
+################################################################################
+a = [g.complex(grid) for i in range(3)]
+b = [g.complex(grid) for i in range(3)]
+rng.cnormal(a)
+c = [g.copy(x) for x in a]
+Qt = np.array([[1, 2, 3], [9, 7, 13], [15, 17, 19]], dtype=np.complex128)
+for i in range(3):
+    g.linear_combination(b[i], a, Qt[i])
+g.rotate(a, Qt, 0, 3, 0, 3, True)
+g.rotate(c, Qt, 0, 3, 0, 3, False)
+for i in range(3):
+    eps = g.norm2(a[i] - b[i]) / g.norm2(a[i])
+    g.message(f"Test basis rotate {i} on accelerator: {eps}")
+    assert eps < 1e-13
+    eps = g.norm2(c[i] - b[i]) / g.norm2(a[i])
+    g.message(f"Test basis rotate {i} on host: {eps}")
+    assert eps < 1e-13
 
 ################################################################################
 # Test mem_report
