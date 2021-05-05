@@ -156,11 +156,11 @@ public:
   }
 
   virtual void pick_checkerboard_from(int cb, cgpt_Lattice_base* src) {
-    pickCheckerboard(cb, l, compatible<T>(src)->l);
+    cgpt_pickCheckerboard(cb, l, compatible<T>(src)->l);
   }
 
   virtual void set_checkerboard_from(cgpt_Lattice_base* src) {
-    setCheckerboard(l, compatible<T>(src)->l);
+    cgpt_setCheckerboard(l, compatible<T>(src)->l);
   }
 
   virtual void change_checkerboard(int cb) {
@@ -171,16 +171,16 @@ public:
     return l.Checkerboard();
   }
 
-  virtual void basis_rotate(std::vector<cgpt_Lattice_base*> &_basis,RealD* Qt,int j0, int j1, int k0,int k1,int Nm) {
+  virtual void basis_rotate(std::vector<cgpt_Lattice_base*> &_basis,RealD* Qt,int j0, int j1, int k0,int k1,int Nm,bool use_accelerator) {
     PVector<Lattice<T>> basis;
     cgpt_basis_fill(basis,_basis);
-    cgpt_basis_rotate(basis,Qt,j0,j1,k0,k1,Nm);
+    cgpt_basis_rotate(basis,Qt,j0,j1,k0,k1,Nm,use_accelerator);
   }
 
-  virtual void basis_rotate(std::vector<cgpt_Lattice_base*> &_basis,ComplexD* Qt,int j0, int j1, int k0,int k1,int Nm) {
+  virtual void basis_rotate(std::vector<cgpt_Lattice_base*> &_basis,ComplexD* Qt,int j0, int j1, int k0,int k1,int Nm,bool use_accelerator) {
     PVector<Lattice<T>> basis;
     cgpt_basis_fill(basis,_basis);
-    cgpt_basis_rotate(basis,Qt,j0,j1,k0,k1,Nm);
+    cgpt_basis_rotate(basis,Qt,j0,j1,k0,k1,Nm,use_accelerator);
   }
 
   virtual void linear_combination(std::vector<cgpt_Lattice_base*> & _dst, std::vector<cgpt_Lattice_base*> &_basis,ComplexD* Qt, long n_virtual, long basis_n_block) {
