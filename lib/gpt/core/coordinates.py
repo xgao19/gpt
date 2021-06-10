@@ -80,10 +80,13 @@ def apply_1S(dst, src, w):
     dim = src.grid.fdimensions
 
     smear = gpt.complex(src.grid)
+    zero = gpt.complex(src.grid)
+    zero[:]=0.0
     smear.checkerboard(src.checkerboard())
     smear[x] = cgpt.coordinates_gauss(x, w, dim[0:3], [0,0,0], src.grid.precision)
+    mask[x] = cgpt.coordinates_OneIfHalfLatSize(x, dim[0:3], src.grid.precision)
 
-    fft_smear = gpt.eval(gpt.fft([0,1,2])*smear)
+    fft_smear = gpt.eval(gpt.fft([0,1,2])*gpt.where(mask > zero, zero, mask))
 
     dst @= fft_smear * src
 

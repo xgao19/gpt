@@ -18,12 +18,12 @@
 #
 import cgpt, gpt, numpy
 
-def gauge_fix(first):
-    params = {
-            "U_grid": first[0].grid.obj,
-            "U": [u.v_obj[0] for u in first],
+def gauge_fix(U, maxiter=1000, prec=1e-8):
+    field = {
+            "U_grid": U[0].grid.obj,
+            "U": [u.v_obj[0] for u in U],
         }
-    r, f = cgpt.Gauge_fix(params)
+    r, f = cgpt.Gauge_fix(field, maxiter, prec)
 
     # for gr in r:
     #     print("HALLO")
@@ -41,14 +41,14 @@ def gauge_fix(first):
             # only allow loading su3 gauge fields from cgpt, rest done in python
             # in the long run, replace *any* IO from cgpt with gpt code
             assert s_ot == "ot_mcolor3"
-            l = gpt.lattice(first[0].grid, otype, [t_obj])
+            l = gpt.lattice(U[0].grid, otype, [t_obj])
 
             # l.metadata = metadata
             result_grid.append(l)
         result.append(result_grid)
     while len(result) == 1:
         result = result[0]
-    fix = gpt.lattice(first[0], gpt.ot_matrix_su_n_fundamental_group(3),[f[0]])
+    fix = gpt.lattice(U[0], gpt.ot_matrix_su_n_fundamental_group(3),[f[0]])
 
     return result, fix
 
