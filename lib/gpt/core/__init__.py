@@ -89,6 +89,7 @@ from gpt.core.coordinates import (
     apply_boosted_1S,
     apply_1S,
     apply_2S,
+    correlate,
 )
 from gpt.core.random import random, sha256
 from gpt.core.mem import mem_info, mem_report, accelerator, host

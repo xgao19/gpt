@@ -18,3 +18,4 @@
 #
 from gpt.qcd.gauge.smear.stout import stout
 from gpt.qcd.gauge.smear.hyp import hyp
+from gpt.qcd.gauge.smear.wilson_flow import wilson_flow
