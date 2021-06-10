@@ -35,7 +35,7 @@ void cgpt_linear_combination(VLattice &result,VLattice &basis,ComplexD* Qt,long 
   VECTOR_VIEW_OPEN(result,result_v,CpuWriteDiscard);
   VECTOR_VIEW_OPEN(basis,basis_v,CpuRead);
 
-  typedef typename std::remove_reference<decltype(basis_v[0][0])>::type vobj;
+  typedef typename std::remove_const<decltype(coalescedRead(basis_v[0][0]))>::type vobj;
 
   thread_for(ss, grid->oSites(),{
   
@@ -43,9 +43,9 @@ void cgpt_linear_combination(VLattice &result,VLattice &basis,ComplexD* Qt,long 
       for (long i=0;i<n_vec;i++) {
         vobj B = Zero();
 	for(long k=0; k<n_basis; k++) {
-          B += Qt[k + i*n_basis] * basis_v[k*n_virtual + j][ss];
+          B += Qt[k + i*n_basis] * coalescedRead(basis_v[k*n_virtual + j][ss]);
 	}
-        result_v[i*n_virtual + j][ss] = B;
+        coalescedWrite(result_v[i*n_virtual + j][ss], B);
       }
     }
 
@@ -118,7 +118,7 @@ void cgpt_bilinear_combination(VLattice &result,VLattice &left_basis,VLattice &r
   VECTOR_VIEW_OPEN(left_basis,left_basis_v,CpuRead);
   VECTOR_VIEW_OPEN(right_basis,right_basis_v,CpuRead);
 
-  typedef typename std::remove_reference<decltype(left_basis_v[0][0])>::type vobj;
+  typedef typename std::remove_const<decltype(coalescedRead(left_basis_v[0][0]))>::type vobj;
 
   thread_for(ss, grid->oSites(),{
   
@@ -128,9 +128,9 @@ void cgpt_bilinear_combination(VLattice &result,VLattice &left_basis,VLattice &r
 	for(long k=0; k<n_elements; k++) {
 	  int32_t left_index = left_indices[k + i*n_elements];
 	  int32_t right_index = right_indices[k + i*n_elements];
-          B += Qt[k + i*n_elements] * left_basis_v[left_index*n_virtual + j][ss] * right_basis_v[right_index*n_virtual + j][ss];
+          B += Qt[k + i*n_elements] * coalescedRead(left_basis_v[left_index*n_virtual + j][ss]) * coalescedRead(right_basis_v[right_index*n_virtual + j][ss]);
 	}
-        result_v[i*n_virtual + j][ss] = B;
+        coalescedWrite(result_v[i*n_virtual + j][ss], B);
       }
     }
 
@@ -191,4 +191,40 @@ void cgpt_bilinear_combination(VLattice &result,VLattice &left_basis,VLattice &r
 #endif
 
   
+}
+
+template<class VField, class Matrix>
+void cgpt_basis_rotate_cpu(VField &basis,Matrix& Qt,int j0, int j1, int k0,int k1,int Nm) {
+  typedef decltype(basis[0]) Field;
+  typedef decltype(basis[0].View(CpuRead)) View;
+
+  Vector<View> basis_v; basis_v.reserve(basis.size());
+  typedef typename std::remove_reference<decltype(basis_v[0][0])>::type vobj;
+  typedef typename std::remove_reference<decltype(Qt(0,0))>::type Coeff_t;
+  GridBase* grid = basis[0].Grid();
+      
+  for(int k=0;k<basis.size();k++){
+    basis_v.push_back(basis[k].View(CpuWrite));
+  }
+
+  int max_threads = thread_max();
+  Vector < vobj > Bt(Nm * max_threads);
+  thread_region
+    {
+      vobj* B = &Bt[Nm * thread_num()];
+      thread_for_in_region(ss, grid->oSites(),{
+	  for(int j=j0; j<j1; ++j) B[j]=0.;
+      
+	  for(int j=j0; j<j1; ++j){
+	    for(int k=k0; k<k1; ++k){
+	      B[j] +=Qt(j,k) * basis_v[k][ss];
+	    }
+	  }
+	  for(int j=j0; j<j1; ++j){
+	    basis_v[j][ss] = B[j];
+	  }
+	});
+    }
+
+  for(int k=0;k<basis.size();k++) basis_v[k].ViewClose();
 }
