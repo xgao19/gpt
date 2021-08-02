@@ -5,9 +5,11 @@ EXPORT(Gauge_fix,{
     
     PyObject* _metadata;
     PyObject* _args;
+    PyObject* _maxiter;
+    PyObject* _prec;
     PyObject* _ret;
 
-    if (!PyArg_ParseTuple(args, "O", &_args)) {
+    if (!PyArg_ParseTuple(args, "OOO", &_args, &_maxiter, &_prec)) {
       std::cout << "Error reading arguments" << std::endl;
       return NULL;
     }
@@ -25,11 +27,15 @@ EXPORT(Gauge_fix,{
     }
 
     // Now do gauge fixing
+
     Real alpha=0.1;
+    int maxiter;
+    Real prec;
+    cgpt_convert(_prec, prec);
+    cgpt_convert(_maxiter, maxiter);
     LatticeColourMatrixD xform1(grid);
 
-    FourierAcceleratedGaugeFixer<PeriodicGimplR>::SteepestDescentGaugeFix(U,xform1,alpha,10000,1.0e-12, 1.0e-12,true,3);
-
+    FourierAcceleratedGaugeFixer<PeriodicGimplR>::SteepestDescentGaugeFix(U,xform1,alpha,maxiter,prec,prec,false,3);
 
     // Transfrom back to stuff that gpt can deal with
     std::vector< cgpt_Lattice_base* > U_prime(4);

@@ -290,6 +290,74 @@ EXPORT(coordinates_momentum_phase,{
   });
 
 
+  EXPORT(coordinates_OneIfHalfLatSize,{
+
+  //fills a lattice with one if one coordintate is lattice size/2, zero else
+
+  PyObject* _coordinates, * _L, * _prec;
+    if (!PyArg_ParseTuple(args, "OOO", &_coordinates, &_L, &_prec)) {
+      return NULL;
+    }
+
+    std::vector<int> L;
+    std::string prec;
+    cgpt_convert(_L,L);
+    cgpt_convert(_prec, prec);
+    int dtype = infer_numpy_type(prec);
+
+    ASSERT(cgpt_PyArray_Check(_coordinates));
+    PyArrayObject* coordinates = (PyArrayObject*)_coordinates;
+    ASSERT(PyArray_TYPE(coordinates)==NPY_INT32);
+    ASSERT(PyArray_NDIM(coordinates) == 2);
+    long* tdim = PyArray_DIMS(coordinates);
+    long nc    = tdim[0];
+    long nd    = tdim[1];
+    int32_t* s = (int32_t*)PyArray_DATA(coordinates);
+    ASSERT((nd -1) == L.size());
+    std::vector<long> dims(2);
+    dims[0]=nc;
+    dims[1]=1;
+    PyArrayObject* a = cgpt_new_PyArray((int)dims.size(),&dims[0],dtype);
+    if (dtype == NPY_COMPLEX64) {
+      ComplexF* d = (ComplexF*)PyArray_DATA(a);
+
+      thread_for(i,nc,{
+          long j;
+          ComplexF arg = 0.0;
+
+          for (j=0;j<nd-1;j++) {
+
+            if(s[i*nd+j] == L[j]/2){
+                //printf("dir: %d, length/2 = %d, coord = %d", j, L[j]/2, s[i*nd+j]);
+                arg += ComplexF(1.0,0.0);
+            }
+          }
+          d[i] = arg;
+        });
+
+    } else if (dtype == NPY_COMPLEX128) {
+      ComplexD* d = (ComplexD*)PyArray_DATA(a);
+
+    thread_for(i,nc,{
+          long j;
+          ComplexD arg = 0.0;
+
+          for (j=0;j<nd-1;j++) {
+
+            if(s[i*nd+j] == L[j]/2){
+                //printf("dir: %d, length/2 = %d, coord = %d", j, L[j]/2, s[i*nd+j]);
+                arg += ComplexD(1.0,0.0);
+            }
+
+          }
+          d[i] = arg;
+        });
+    }
+
+    return (PyObject*)a;
+  });
+
+
   EXPORT(coordinates_gauss,{
 
     // symmetrized form of exp(- 1/2 w ^2 (x)^2)
@@ -317,38 +385,47 @@ EXPORT(coordinates_momentum_phase,{
     long nd    = tdim[1];
     int32_t* s = (int32_t*)PyArray_DATA(coordinates);
     ASSERT((nd -1) == L.size());
-    RealD pi = 3.14159265;
+    RealD pi = 3.14159265359;
     std::vector<long> dims(2);
     dims[0]=nc;
     dims[1]=1;
     PyArrayObject* a = cgpt_new_PyArray((int)dims.size(),&dims[0],dtype);
     if (dtype == NPY_COMPLEX64) {
       ComplexF* d = (ComplexF*)PyArray_DATA(a);
-
+      RealF norm = 0.0;
       thread_for(i,nc,{
 	  long j;
 	  ComplexF arg = 0.0;
 
 	  for (j=0;j<nd-1;j++) {
-      RealF x = (s[i*nd+j] + L[j]/2)%L[j] - L[j]/2;
+            RealF x = (s[i*nd+j] + L[j]/2)%L[j] - L[j]/2;
 	    arg+=  ComplexF(-0.5/(w*w) * x * x , x * 2* pi/L[j] * k[j]);
 	  }
 	  d[i] = exp(arg);
+          norm += abs(d[i]); 
+	});
+
+      thread_for(i,nc,{
+          d[i]/=norm;
 	});
 
     } else if (dtype == NPY_COMPLEX128) {
       ComplexD* d = (ComplexD*)PyArray_DATA(a);
-      RealD pi = 3.141;
-
+      //RealD pi = 3.141;
+      RealD norm = 0.0;
       thread_for(i,nc,{
 	  long j;
 	  ComplexD arg = 0.0;
 
 	  for (j=0;j<nd-1;j++) {
-      RealD x = (s[i*nd+j] + L[j]/2)%L[j] - L[j]/2;
+            RealD x = (s[i*nd+j] + L[j]/2)%L[j] - L[j]/2;
 	    arg+=  ComplexF(-0.5/(w*w) * x * x, x * 2* pi/L[j] * k[j]);
 	  }
 	  d[i] = exp(arg);
+	  norm += abs(d[i]);
+	});
+       thread_for(i,nc,{
+	   d[i]/=norm;
 	});
     }
 
