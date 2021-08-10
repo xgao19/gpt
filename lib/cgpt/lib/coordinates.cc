@@ -392,7 +392,7 @@ EXPORT(coordinates_momentum_phase,{
     PyArrayObject* a = cgpt_new_PyArray((int)dims.size(),&dims[0],dtype);
     if (dtype == NPY_COMPLEX64) {
       ComplexF* d = (ComplexF*)PyArray_DATA(a);
-      RealF norm = 0.0;
+      //RealF norm = 0.0;
       thread_for(i,nc,{
 	  long j;
 	  ComplexF arg = 0.0;
@@ -402,17 +402,17 @@ EXPORT(coordinates_momentum_phase,{
 	    arg+=  ComplexF(-0.5/(w*w) * x * x , x * 2* pi/L[j] * k[j]);
 	  }
 	  d[i] = exp(arg);
-          norm += abs(d[i]); 
+         // norm += abs(d[i]); 
 	});
 
-      thread_for(i,nc,{
-          d[i]/=norm;
-	});
+      //thread_for(i,nc,{
+      //    d[i]/=norm;
+      //});
 
     } else if (dtype == NPY_COMPLEX128) {
       ComplexD* d = (ComplexD*)PyArray_DATA(a);
       //RealD pi = 3.141;
-      RealD norm = 0.0;
+      //RealD norm = 0.0;
       thread_for(i,nc,{
 	  long j;
 	  ComplexD arg = 0.0;
@@ -422,11 +422,11 @@ EXPORT(coordinates_momentum_phase,{
 	    arg+=  ComplexF(-0.5/(w*w) * x * x, x * 2* pi/L[j] * k[j]);
 	  }
 	  d[i] = exp(arg);
-	  norm += abs(d[i]);
+	 // norm += abs(d[i]);
 	});
-       thread_for(i,nc,{
-	   d[i]/=norm;
-	});
+       //thread_for(i,nc,{
+       //   d[i]/=norm;
+       //});
     }
 
     return (PyObject*)a;
