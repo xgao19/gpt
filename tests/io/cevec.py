@@ -6,7 +6,7 @@
 #
 import gpt as g
 import sys, os
-import numpy as np
+#import numpy as np
 
 # workdir
 if "WORK_DIR" in os.environ:

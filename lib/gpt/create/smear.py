@@ -60,11 +60,14 @@ def gauss(U, params):
 def boosted_smearing(U_trafo, src, params):
     w = params["w"]
     boost = params["boost"]
+    dims = src.grid.fdimensions
+    Vol = dims[0]*dims[1]*dims[2]
+
     dst = g.mspincolor(U_trafo.grid)
     #source in fixed gauge
     gf_src = g.eval(U_trafo*src)
     #do fft for dims 0,1,2
-    fft =g.eval(g.fft([0,1,2])*gf_src)
+    fft =g.eval(Vol*g.fft([0,1,2])*gf_src)
     # multiply with shifted gaussian in mom. space. Parameters: destination, source, "width", boost 
     g.apply_boosted_1S(dst, fft, w, boost)
     #inverse fft to position space
@@ -76,11 +79,14 @@ def boosted_smearing(U_trafo, src, params):
 def OneS_smearing(U_trafo, src, params):
     w = params["w"]
     boost = [0,0,0]
+    dims = src.grid.fdimensions
+    Vol = dims[0]*dims[1]*dims[2]
+    
     dst = g.mspincolor(U_trafo.grid)
     #source in fixed gauge
     gf_src = g.eval(U_trafo*src)
     #do fft for dims 0,1,2
-    fft =g.eval(g.fft([0,1,2])*gf_src)
+    fft =g.eval(Vol*g.fft([0,1,2])*gf_src)
     # multiply with gaussian in mom. space
     g.apply_1S(dst, fft, w)
     #inverse fft to position space
@@ -92,11 +98,14 @@ def OneS_smearing(U_trafo, src, params):
 def TwoS_smearing(U_trafo, src, params):
     w = params["w"]
     b = params["b"]
+    dims = src.grid.fdimensions
+    Vol = dims[0]*dims[1]*dims[2]
+
     dst = g.mspincolor(U_trafo.grid)
     #source in fixed gauge
     gf_src = g.eval(U_trafo*src)
     #do fft for dims 0,1,2
-    fft =g.eval(g.fft([0,1,2])*gf_src)
+    fft =g.eval(Vol*g.fft([0,1,2])*gf_src)
     # multiply with smearing Kernel in mom. space
     g.apply_2S(dst, fft, w, b)
     #inverse fft to position space
