@@ -9,22 +9,25 @@ import gpt as g
 import numpy as np
 import sys, cgpt
 
-# grid
-L = [16, 12, 12, 24]
-grid_dp = g.grid(L, g.double)
-grid_sp = g.grid(L, g.single)
-
-# test fields
+# random
 rng = g.random("test")
-l_dp = rng.cnormal(g.vcolor(grid_dp))
-l_sp = g.convert(l_dp, g.single)
 
-# and convert precision
-l_dp_prime = g.convert(l_sp, g.double)
-eps2 = g.norm2(l_dp - l_dp_prime) / g.norm2(l_dp)
-assert eps2 < 1e-14
-eps2 = g.norm2(l_dp[0, 0, 0, 0] - l_sp[0, 0, 0, 0])
-assert eps2 < 1e-14
+# grid
+L = [8, 12, 24, 24]
+for rb in [g.redblack, g.full]:
+    grid_dp = g.grid(L, g.double, rb)
+    grid_sp = g.grid(L, g.single, rb)
+
+    # test fields
+    l_dp = rng.cnormal(g.vcolor(grid_dp))
+    l_sp = g.convert(l_dp, g.single)
+
+    # and convert precision
+    l_dp_prime = g.convert(l_sp, g.double)
+    eps2 = g.norm2(l_dp - l_dp_prime) / g.norm2(l_dp)
+    assert eps2 < 1e-14
+    eps2 = g.norm2(l_dp[0, 0, 0, 0] - l_sp[0, 0, 0, 0])
+    assert eps2 < 1e-14
 
 
 ################################################################################
@@ -142,6 +145,42 @@ for t in range(L[3]):
     eps = g.norm2(fft_mom_A[t] - fft_mom_B[t])
     assert eps < 1e-12
 
+
+################################################################################
+# Test correlate
+################################################################################
+def correlate_test_3d(a, b, x):
+    # c[x] = (1/vol) sum_y a[y]*b[y+x]
+    bprime = b
+    L = a.grid.gdimensions
+    vol = L[0] * L[1] * L[2]
+    for i in range(3):
+        # see core test: dst = g.cshift(src, 0, 1) -> dst[x] = src[x+1]
+        bprime = g.cshift(bprime, i, x[i])  # bprime[y] = b[y+x]
+    return g.slice(a * bprime, 3)[x[3]] / vol
+
+
+def correlate_test_4d(a, b, x):
+    # c[x] = (1/vol) sum_y a[y]*b[y+x]
+    bprime = b
+    L = a.grid.gdimensions
+    vol = L[0] * L[1] * L[2] * L[3]
+    for i in range(4):
+        # see core test: dst = g.cshift(src, 0, 1) -> dst[x] = src[x+1]
+        bprime = g.cshift(bprime, i, x[i])  # bprime[y] = b[y+x]
+    return g.sum(a * bprime) / vol
+
+
+A, B = rng.cnormal([g.complex(grid_dp) for i in range(2)])
+eps = abs(
+    g.correlate(A, B, [0, 1, 2])[1, 0, 3, 2] - correlate_test_3d(A, B, [1, 0, 3, 2])
+)
+g.message(f"Test correlate 3d: {eps}")
+assert eps < 1e-13
+eps = abs(g.correlate(A, B)[1, 0, 3, 2] - correlate_test_4d(A, B, [1, 0, 3, 2]))
+g.message(f"Test correlate 4d: {eps}")
+assert eps < 1e-13
+
 ################################################################################
 # Test vcomplex
 ################################################################################
@@ -202,7 +241,7 @@ g.copy(new, src)
 # cshift into a new lattice dst
 dst = g.cshift(src, 0, 1)
 # dst[x] = src[x+1] -> src[0] == dst[15]
-assert abs(dst[15, 0, 0, 0] - complex(2, 1)) < 1e-6
+assert abs(dst[7, 0, 0, 0] - complex(2, 1)) < 1e-6
 
 ################################################################################
 # Test multi inner_product

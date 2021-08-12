@@ -17,3 +17,4 @@
 #    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 #
 from gpt.qcd.gauge.smear.stout import stout
+from gpt.qcd.gauge.smear.wilson_flow import wilson_flow
