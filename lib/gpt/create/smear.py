@@ -41,12 +41,16 @@ def laplace(cov, dimensions):
     return g.matrix_operator(mat=mat)
 
 
-@params_convention(boundary_phases=[1, 1, 1, -1], dimensions=[0, 1, 2])
+@params_convention(
+    boundary_phases=[1, 1, 1, -1], dimensions=[0, 1, 2], sigma=None, steps=None
+)
 def gauss(U, params):
     sigma = params["sigma"]
     steps = params["steps"]
     dimensions = params["dimensions"]
-    lap = laplace(g.covariant.shift(U, params), dimensions)
+    lap = laplace(
+        g.covariant.shift(U, boundary_phases=params["boundary_phases"]), dimensions
+    )
 
     def mat(dst, src):
         assert dst != src
@@ -56,7 +60,7 @@ def gauss(U, params):
 
     return g.matrix_operator(mat=mat)
 
-@params_convention(params=None)
+@params_convention(w=None, boost=None)
 def boosted_smearing(U_trafo, src, params):
     w = params["w"]
     boost = params["boost"]
@@ -75,7 +79,7 @@ def boosted_smearing(U_trafo, src, params):
     #multiply boosted source with Omega^dagger
     return g.eval(g.adj(U_trafo)*back)
 
-@params_convention(params=None)
+@params_convention(w=None)
 def OneS_smearing(U_trafo, src, params):
     w = params["w"]
     boost = [0,0,0]
@@ -94,7 +98,7 @@ def OneS_smearing(U_trafo, src, params):
     #multiply boosted source with Omega^dagger
     return g.eval(g.adj(U_trafo)*back)
 
-@params_convention(params=None)
+@params_convention(w=None, b=None)
 def TwoS_smearing(U_trafo, src, params):
     w = params["w"]
     b = params["b"]
