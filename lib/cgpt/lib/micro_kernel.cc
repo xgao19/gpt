@@ -2,7 +2,6 @@
     GPT - Grid Python Toolkit
     Copyright (C) 2020  Christoph Lehner (christoph.lehner@ur.de, https://github.com/lehner/gpt)
 
-
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
     the Free Software Foundation; either version 2 of the License, or
@@ -17,36 +16,28 @@
     with this program; if not, write to the Free Software Foundation, Inc.,
     51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 */
+#include "lib.h"
 
-template<typename T>
-void cgpt_scale_per_coordinate(Lattice<T>& dst,Lattice<T>& src,ComplexD* s,int dim) {
+void eval_micro_kernels(const std::vector<micro_kernel_t> & kernels, const micro_kernel_blocking_t & blocking) {
 
-  GridBase* grid = dst.Grid();
-  conformable(grid, src.Grid());
+  size_t n = kernels.size();
 
-  dst.Checkerboard() = src.Checkerboard();
+  size_t o_sites = kernels[0].arg.o_sites;
+  size_t block_size = blocking.block_size;
+  size_t subblock_size = blocking.subblock_size;
 
-  int L = grid->_gdimensions[dim];
-    
-  autoView(dst_v, dst, AcceleratorWriteDiscard);
-  autoView(src_v, src, AcceleratorRead);
+  micro_kernel_region({
+      
+      for (size_t j=0;j<(o_sites + block_size - 1)/block_size;j++) {
 
-  auto dst_p = &dst_v[0];
-  auto src_p = &src_v[0];
+        for (size_t i=0;i<n;i++) {
+          auto& k = kernels[i];
+          
+          size_t j0 = std::min(j*block_size, o_sites);
+          size_t j1 = std::min(j0 + block_size, o_sites);
+          k.action(k.arg, j0, j1, subblock_size);
+        }
 
-  Vector<ComplexD> _S(L);
-  ComplexD* S = &_S[0];
-  thread_for(idx, L, {
-      S[idx] = s[idx];
+      }
     });
-
-  if (dim == 0 && grid->_simd_layout[0] == 1) {
-    accelerator_for(idx, grid->oSites(), T::Nsimd(), {
-        int s_idx = idx % L;
-        coalescedWrite(dst_p[idx], coalescedRead(src_p[idx]) * S[s_idx]);
-      });
-  } else {
-    ERR("Not implemented yet");
-  }
-  
 }
