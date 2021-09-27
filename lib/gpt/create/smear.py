@@ -60,7 +60,7 @@ def gauss(U, params):
 
     return g.matrix_operator(mat=mat)
 
-@params_convention(params=None)
+@params_convention(w=None, boost=None)
 def boosted_smearing(U_trafo, src, params):
     w = params["w"]
     boost = params["boost"]
