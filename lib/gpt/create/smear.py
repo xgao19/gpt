@@ -79,7 +79,7 @@ def boosted_smearing(U_trafo, src, params):
     #multiply boosted source with Omega^dagger
     return g.eval(g.adj(U_trafo)*back)
 
-@params_convention(params=None)
+@params_convention(w=None)
 def OneS_smearing(U_trafo, src, params):
     w = params["w"]
     boost = [0,0,0]
@@ -98,7 +98,7 @@ def OneS_smearing(U_trafo, src, params):
     #multiply boosted source with Omega^dagger
     return g.eval(g.adj(U_trafo)*back)
 
-@params_convention(params=None)
+@params_convention(w=None, b=None)
 def TwoS_smearing(U_trafo, src, params):
     w = params["w"]
     b = params["b"]
