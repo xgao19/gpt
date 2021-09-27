@@ -2,7 +2,6 @@
     GPT - Grid Python Toolkit
     Copyright (C) 2020  Christoph Lehner (christoph.lehner@ur.de, https://github.com/lehner/gpt)
 
-
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
     the Free Software Foundation; either version 2 of the License, or
@@ -18,35 +17,44 @@
     51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 */
 
-template<typename T>
-void cgpt_scale_per_coordinate(Lattice<T>& dst,Lattice<T>& src,ComplexD* s,int dim) {
+class ViewContainerBase {
+public:
+  virtual ~ViewContainerBase() {};
+};
 
-  GridBase* grid = dst.Grid();
-  conformable(grid, src.Grid());
-
-  dst.Checkerboard() = src.Checkerboard();
-
-  int L = grid->_gdimensions[dim];
-    
-  autoView(dst_v, dst, AcceleratorWriteDiscard);
-  autoView(src_v, src, AcceleratorRead);
-
-  auto dst_p = &dst_v[0];
-  auto src_p = &src_v[0];
-
-  Vector<ComplexD> _S(L);
-  ComplexD* S = &_S[0];
-  thread_for(idx, L, {
-      S[idx] = s[idx];
-    });
-
-  if (dim == 0 && grid->_simd_layout[0] == 1) {
-    accelerator_for(idx, grid->oSites(), T::Nsimd(), {
-        int s_idx = idx % L;
-        coalescedWrite(dst_p[idx], coalescedRead(src_p[idx]) * S[s_idx]);
-      });
-  } else {
-    ERR("Not implemented yet");
-  }
+template<class View> 
+class ViewContainer : public ViewContainerBase {
+public:
+  View v;
   
-}
+  ViewContainer(View &_v) : v(_v) {};
+  virtual ~ViewContainer() { v.ViewClose(); }
+};
+
+struct micro_kernel_arg_t {
+  struct tuple_t {
+    ViewContainerBase* view;
+    bool persistent;
+  };
+  
+  std::vector<tuple_t> views;
+  size_t o_sites;
+
+  template<class T>
+  void add(Lattice<T>& l, ViewMode mode, bool persistent = true) {
+    size_t _o_sites = l.Grid()->oSites();
+    if (views.size() == 0) {
+      o_sites = _o_sites;
+    } else {
+      ASSERT(o_sites == _o_sites);
+    }
+    auto l_v = l.View(mode);
+    views.push_back({ new ViewContainer<decltype(l_v)>(l_v), persistent });
+  }
+
+  void release() {
+    for (auto x : views)
+      delete x.view;
+  }
+
+};
