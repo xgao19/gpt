@@ -200,6 +200,23 @@ def slice(src, dim):
     return [gpt.util.value_to_tensor(v, src[0].otype) for v in result[0]]
 
 
+def slice_tr(src, dim):
+    return_list = isinstance(src, list)
+    src = gpt.util.to_list(gpt.eval(src))
+
+    # check for consistent otype
+    assert all([src[0].otype == obj.otype for obj in src])
+
+    result = cgpt.slice_trace(src, dim)
+
+    if return_list:
+        #return [[gpt.util.value_to_tensor(v, src[0].otype) for v in res] for res in result]
+        return [[complex(v) for v in res] for res in result]
+    return [complex(v) for v in result[0]]
+    #return [gpt.util.value_to_tensor(v, src[0].otype) for v in result[0]]
+
+
+
 def identity(src):
     eye = gpt.lattice(src)
     eye[:] = src.otype.identity()

@@ -488,7 +488,7 @@ EXPORT(coordinates_momentum_phase,{
 	    arg+=  ComplexF(-0.5/(w*w) * x * x, x * 2* pi/L[j] * k[j]);
 	  }
 	  d[i] = exp(arg);
-	  norm += abs(d[i]);
+//	  norm += abs(d[i]);
 	});
 //       thread_for(i,nc,{
 //	   d[i]/=norm;
