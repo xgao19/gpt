@@ -45,6 +45,7 @@ from gpt.core.transform import (
     axpy_norm2,
     slice,
     slice_tr,
+    slice_tr1,
     identity,
     project,
     where,
