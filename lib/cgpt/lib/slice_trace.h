@@ -5,6 +5,25 @@ std::vector<Gamma::Algebra> Gmu4 ( {
   Gamma::Algebra::GammaT });
 
 
+std::vector<Gamma::Algebra> Gmu16 ( {
+  Gamma::Algebra::Gamma5,
+  Gamma::Algebra::GammaT,
+  Gamma::Algebra::GammaTGamma5,
+  Gamma::Algebra::GammaX,
+  Gamma::Algebra::GammaXGamma5,
+  Gamma::Algebra::GammaY,
+  Gamma::Algebra::GammaYGamma5,
+  Gamma::Algebra::GammaZ,
+  Gamma::Algebra::GammaZGamma5,
+  Gamma::Algebra::Identity,
+  Gamma::Algebra::SigmaXT,
+  Gamma::Algebra::SigmaXY,
+  Gamma::Algebra::SigmaXZ,
+  Gamma::Algebra::SigmaYT,
+  Gamma::Algebra::SigmaYZ,
+  Gamma::Algebra::SigmaZT
+});
+
 // sliceSum from Grid but with vector of lattices as input and traces as output
 template<class vobj>
 inline void cgpt_slice_trace_sums(const PVector<Lattice<vobj>> &Data,
@@ -91,7 +110,8 @@ inline void cgpt_slice_trace_sums(const PVector<Lattice<vobj>> &Data,
     }
   });
   scalar_type* ptr = (scalar_type *) &result[0];
-  int words = fd * sizeof(sobj) / sizeof(scalar_type) * Nbasis;
+//  int words = fd * sizeof(sobj) / sizeof(scalar_type) * Nbasis;
+  int words = fd * Nbasis;
   grid->GlobalSumVector(ptr, words);
 }
 
@@ -148,7 +168,7 @@ inline void cgpt_slice_trace_sums1(const PVector<Lattice<vobj>> &Data,
   const int  Nsimd = grid->Nsimd();
   const int Nbasis = Data.size();
 
-  const int Ngamma = Gmu4.size();
+  const int Ngamma = Gmu16.size();
 
   assert(orthogdim >= 0);
   assert(orthogdim < Nd);
@@ -160,6 +180,7 @@ inline void cgpt_slice_trace_sums1(const PVector<Lattice<vobj>> &Data,
   Vector<vobj> lvSum(rd * Nbasis);         // will locally sum vectors first
   Vector<sobj> lsSum(ld * Nbasis, Zero()); // sum across these down to scalars
   result.resize(fd * Nbasis * Ngamma);              // And then global sum to return the same vector to every node
+  //result.resize(fd * Nbasis);
 
   int      e1 = grid->_slice_nblock[orthogdim];
   int      e2 = grid->_slice_block [orthogdim];
@@ -168,11 +189,13 @@ inline void cgpt_slice_trace_sums1(const PVector<Lattice<vobj>> &Data,
 
   // sum over reduced dimension planes, breaking out orthog dir
   // Parallel over orthog direction
+  //printf("in cgpt_slice_trace_sums1, before the Vector views are opened \n");
   VECTOR_VIEW_OPEN(Data, Data_v, AcceleratorRead);
   VECTOR_VIEW_OPEN(Data2, Data2_v, AcceleratorRead);
   auto lvSum_p = &lvSum[0];
   typedef decltype(coalescedRead(Data_v[0][0])) CalcElem;
 
+  //printf("right before the accelerator for \n");
   accelerator_for(r, rd * Nbasis, grid->Nsimd(), {
     CalcElem elem = Zero();
     CalcElem tmp;
@@ -190,8 +213,10 @@ inline void cgpt_slice_trace_sums1(const PVector<Lattice<vobj>> &Data,
 
     coalescedWrite(lvSum_p[r], elem);
   });
+  VECTOR_VIEW_CLOSE(Data2_v);
   VECTOR_VIEW_CLOSE(Data_v);
 
+  //printf("######### inf cgpt_slice_trace_sum1, before thread_for \n");
   thread_for(n_base, Nbasis, {
     // Sum across simd lanes in the plane, breaking out orthog dir.
     ExtractBuffer<sobj> extracted(Nsimd); // splitting the SIMD
@@ -211,17 +236,22 @@ inline void cgpt_slice_trace_sums1(const PVector<Lattice<vobj>> &Data,
       int lt = t % ld;
       if ( pt == grid->_processor_coor[orthogdim] ) {
         
-        result[n_base * Ngamma * fd + mu * fd + t] = TensorRemove(trace(lsSum[n_base * ld + lt]*Gamma(Gmu4[mu])));
-        
+        result[n_base * Ngamma * fd + mu * fd + t] = TensorRemove(trace(lsSum[n_base * ld + lt]*Gamma(Gmu16[mu])));
+        //result[n_base * fd + t] = TensorRemove(trace(lsSum[n_base * ld + lt]));
+
       } else {
         result[n_base * Ngamma * fd + mu * fd + t] = scalar_type(0.0); //Zero();
+        //result[n_base * fd +t] = scalar_type(0.0);
       }
     }
     }
   });
   scalar_type* ptr = (scalar_type *) &result[0];
-  int words = fd * sizeof(sobj) / sizeof(scalar_type) * Nbasis;
+  //int words = fd * sizeof(sobj) / sizeof(scalar_type) * Nbasis;
+  int words = fd * Ngamma * Nbasis;
+  //int words = fd * Nbasis;
   grid->GlobalSumVector(ptr, words);
+  //printf("######### inf cgpt_slice_trace_sum1, end\n");
 }
 
 template<typename T>
@@ -232,11 +262,12 @@ PyObject* cgpt_slice_trace1(const PVector<Lattice<T>>& lhs, const PVector<Lattic
 
   //std::vector<sobj> result;
   std::vector<scalar_type> result;
+//  printf("in cgpt_slice_trace1, before going into actual function \n");
   cgpt_slice_trace_sums1(lhs, rhs, result, dim);
 
   int Nbasis = lhs.size();
-  int NGamma = Gmu4.size();
-  int Nsobj  = result.size() / lhs.size() / Gmu4.size();
+  int NGamma = Gmu16.size();
+  int Nsobj  = result.size() / lhs.size() / Gmu16.size();
 
   PyObject* ret = PyList_New(Nbasis);
   for (size_t ii = 0; ii < Nbasis; ii++) {
@@ -248,7 +279,7 @@ PyObject* cgpt_slice_trace1(const PVector<Lattice<T>>& lhs, const PVector<Lattic
       PyObject* corr = PyList_New(Nsobj);
 
       for (size_t kk = 0; kk < Nsobj; kk++) {
-        int nn = ii * NGamma * Nbasis + jj * Nsobj + kk;
+        int nn = ii * NGamma * Nsobj + jj * Nsobj + kk;
         //PyList_SET_ITEM(corr, jj, cgpt_numpy_export(result[nn]));
         PyList_SET_ITEM(corr, kk, PyComplex_FromDoubles(result[nn].real(),result[nn].imag()));
       }
