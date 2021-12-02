@@ -216,7 +216,7 @@ def slice_tr(src, dim):
     #return [gpt.util.value_to_tensor(v, src[0].otype) for v in result[0]]
 
 
-def slice_tr1(src, rhs, dim):
+def slice_tr1(src, rhs, mom, dim):
     return_list = isinstance(src, list)
     src = gpt.util.to_list(gpt.eval(src))
     rhs = gpt.util.to_list(gpt.eval(rhs))
@@ -226,7 +226,7 @@ def slice_tr1(src, rhs, dim):
     assert all([rhs[0].otype == obj.otype for obj in rhs])
 #    assert(rhs[0].otype == src[0].otype)
 
-    result = cgpt.slice_trace1(src, rhs, dim)
+    result = cgpt.slice_trace1(src, rhs, mom, dim)
 
     return result
 

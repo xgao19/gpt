@@ -48,10 +48,16 @@ inline void cgpt_slice_trace_sums(const PVector<Lattice<vobj>> &Data,
 
   assert(orthogdim >= 0);
   assert(orthogdim < Nd);
+  
+  std::cout << GridLogMessage << "What is this?? "<<std::endl;
 
   int fd = grid->_fdimensions[orthogdim];
   int ld = grid->_ldimensions[orthogdim];
   int rd = grid->_rdimensions[orthogdim];
+ 
+  std::cout << "fd = " << fd << std::endl;
+  std::cout << "ld = " << ld << std::endl;
+  std::cout << "rd = " << rd << std::endl;
 
   Vector<vobj> lvSum(rd * Nbasis);         // will locally sum vectors first
   Vector<sobj> lsSum(ld * Nbasis, Zero()); // sum across these down to scalars
@@ -61,6 +67,11 @@ inline void cgpt_slice_trace_sums(const PVector<Lattice<vobj>> &Data,
   int      e2 = grid->_slice_block [orthogdim];
   int  stride = grid->_slice_stride[orthogdim];
   int ostride = grid->_ostride[orthogdim];
+
+  std::cout << "e1 = " << e1 << std::endl;
+  std::cout << "e2 = " << e2 << std::endl;
+  std::cout << "stride = " << stride << std::endl;
+  std::cout << "ostride = " << ostride << std::endl;
 
   // sum over reduced dimension planes, breaking out orthog dir
   // Parallel over orthog direction
@@ -150,7 +161,8 @@ PyObject* cgpt_slice_trace(const PVector<Lattice<T>>& basis, int dim) {
 template<class vobj>
 inline void cgpt_slice_trace_sums1(const PVector<Lattice<vobj>> &Data,
                             const PVector<Lattice<vobj>> &Data2,
-                            std::vector<ComplexD> &result,
+                            const PVector<LatticeComplex> &mom,
+                            std::vector<iSinglet<ComplexD>> &result,
                             int orthogdim)
 {
   ///////////////////////////////////////////////////////
@@ -167,6 +179,7 @@ inline void cgpt_slice_trace_sums1(const PVector<Lattice<vobj>> &Data,
   const int     Nd = grid->_ndimension;
   const int  Nsimd = grid->Nsimd();
   const int Nbasis = Data.size();
+  const int Nmom = mom.size();
 
   const int Ngamma = Gmu16.size();
 
@@ -177,9 +190,9 @@ inline void cgpt_slice_trace_sums1(const PVector<Lattice<vobj>> &Data,
   int ld = grid->_ldimensions[orthogdim];
   int rd = grid->_rdimensions[orthogdim];
 
-  Vector<vobj> lvSum(rd * Nbasis);         // will locally sum vectors first
-  Vector<sobj> lsSum(ld * Nbasis, Zero()); // sum across these down to scalars
-  result.resize(fd * Nbasis * Ngamma);              // And then global sum to return the same vector to every node
+  Vector<vobj> lvSum(rd * Nbasis * Nmom);         // will locally sum vectors first
+  Vector<sobj> lsSum(ld * Nbasis * Nmom, Zero()); // sum across these down to scalars
+  result.resize(fd * Nbasis * Ngamma * Nmom);              // And then global sum to return the same vector to every node
   //result.resize(fd * Nbasis);
 
   int      e1 = grid->_slice_nblock[orthogdim];
@@ -192,20 +205,25 @@ inline void cgpt_slice_trace_sums1(const PVector<Lattice<vobj>> &Data,
   //printf("in cgpt_slice_trace_sums1, before the Vector views are opened \n");
   VECTOR_VIEW_OPEN(Data, Data_v, AcceleratorRead);
   VECTOR_VIEW_OPEN(Data2, Data2_v, AcceleratorRead);
+  VECTOR_VIEW_OPEN(mom, mom_v, AcceleratorRead);
   auto lvSum_p = &lvSum[0];
   typedef decltype(coalescedRead(Data_v[0][0])) CalcElem;
 
   //printf("right before the accelerator for \n");
-  accelerator_for(r, rd * Nbasis, grid->Nsimd(), {
+  accelerator_for(r, rd * Nbasis * Nmom, grid->Nsimd(), {
     CalcElem elem = Zero();
     CalcElem tmp;
 
-    int n_base = r / rd;
+    int n_mombase = r / rd;
+    int n_mom = n_mombase % Nmom;
+    int n_base = n_mombase / Nmom;
+
+
     int so = (r % rd) * ostride; // base offset for start of plane
     for(int n = 0; n < e1; n++){
       for(int b = 0; b < e2; b++){
         int ss = so + n * stride + b;
-        elem += coalescedRead(Data2_v[0][ss])*coalescedRead(Data_v[n_base][ss]);
+        elem += coalescedRead(Data2_v[0][ss])*coalescedRead(Data_v[n_base][ss])*coalescedRead(mom_v[n_mom][ss]);
       }
     }
 
@@ -215,9 +233,10 @@ inline void cgpt_slice_trace_sums1(const PVector<Lattice<vobj>> &Data,
   });
   VECTOR_VIEW_CLOSE(Data2_v);
   VECTOR_VIEW_CLOSE(Data_v);
+  VECTOR_VIEW_CLOSE(mom_v);
 
   //printf("######### inf cgpt_slice_trace_sum1, before thread_for \n");
-  thread_for(n_base, Nbasis, {
+  thread_for(n_base, Nbasis*Nmom, {
     // Sum across simd lanes in the plane, breaking out orthog dir.
     ExtractBuffer<sobj> extracted(Nsimd); // splitting the SIMD
     Coordinate icoor(Nd);
@@ -248,47 +267,54 @@ inline void cgpt_slice_trace_sums1(const PVector<Lattice<vobj>> &Data,
   });
   scalar_type* ptr = (scalar_type *) &result[0];
   //int words = fd * sizeof(sobj) / sizeof(scalar_type) * Nbasis;
-  int words = fd * Ngamma * Nbasis;
+  int words = fd * Ngamma * Nbasis * Nmom;
   //int words = fd * Nbasis;
   grid->GlobalSumVector(ptr, words);
   //printf("######### inf cgpt_slice_trace_sum1, end\n");
 }
 
 template<typename T>
-PyObject* cgpt_slice_trace1(const PVector<Lattice<T>>& lhs, const PVector<Lattice<T>>& rhs, int dim) {
+PyObject* cgpt_slice_trace1(const PVector<Lattice<T>>& lhs, const PVector<Lattice<T>>& rhs, 
+                            const PVector<LatticeComplex> mom, int dim) {
   typedef typename Lattice<T>::vector_object vobj;
-  //typedef typename vobj::scalar_object sobj;
-  typedef typename vobj::scalar_type scalar_type;
+  typedef typename iSinglet<ComplexD>::scalar_object sobj;
+  // typedef typename vobj::scalar_type scalar_type;
 
-  //std::vector<sobj> result;
-  std::vector<scalar_type> result;
+  std::vector<sobj> result;
+  // std::vector<scalar_type> result;
 //  printf("in cgpt_slice_trace1, before going into actual function \n");
-  cgpt_slice_trace_sums1(lhs, rhs, result, dim);
+  cgpt_slice_trace_sums1(lhs, rhs, mom, result, dim);
 
   int Nbasis = lhs.size();
+  int Nmom = mom.size();
   int NGamma = Gmu16.size();
-  int Nsobj  = result.size() / lhs.size() / Gmu16.size();
+  int Nsobj  = result.size() / lhs.size() / mom.size() / Gmu16.size() ;
 
   PyObject* ret = PyList_New(Nbasis);
   for (size_t ii = 0; ii < Nbasis; ii++) {
+    PyObject* p = PyList_New(Nmom); 
+    for (size_t mm=0; mm < Nmom; mm++){
 
-    PyObject* mu = PyList_New(NGamma);
+      PyObject* mu = PyList_New(NGamma);
 
-    for (size_t jj = 0; jj < NGamma; jj++) {
-    
-      PyObject* corr = PyList_New(Nsobj);
+      for (size_t jj = 0; jj < NGamma; jj++) {
+      
+        PyObject* corr = PyList_New(Nsobj);
 
-      for (size_t kk = 0; kk < Nsobj; kk++) {
-        int nn = ii * NGamma * Nsobj + jj * Nsobj + kk;
-        //PyList_SET_ITEM(corr, jj, cgpt_numpy_export(result[nn]));
-        PyList_SET_ITEM(corr, kk, PyComplex_FromDoubles(result[nn].real(),result[nn].imag()));
+        for (size_t kk = 0; kk < Nsobj; kk++) {
+          int nn = ii * Nmom * NGamma * Nsobj + mm * NGamma * Nsobj + jj * Nsobj + kk;
+          //PyList_SET_ITEM(corr, jj, cgpt_numpy_export(result[nn]));
+          // PyList_SET_ITEM(corr, kk, PyComplex_FromDoubles(result[nn].real(),result[nn].imag()));
+          PyList_SET_ITEM(corr, kk, cgpt_numpy_export(result[nn]));
+        }
+
+        PyList_SET_ITEM(mu, jj, corr);
+
       }
-
-      PyList_SET_ITEM(mu, jj, corr);
-
+      PyList_SET_ITEM(p, mm, mu);
     }
 
-    PyList_SET_ITEM(ret, ii, mu);
+    PyList_SET_ITEM(ret, ii, p);
   }
 
   return ret;
