@@ -125,13 +125,33 @@ eps = g.norm2(g.adj(exp_ixp * exp_ixp) * exp_ixp * exp_ixp * l_dp - l_dp) / g.no
 g.message("Momentum adj test (2): ", eps)
 assert eps < 1e-20
 
+# arbitrary momentum / sinc reconstruction check
+p_arbitrary = 2.0 * np.pi * np.array([1.5, 2.3, 3.2, 4.1]) / L
+x_origin = np.array([7, 11, 4, 3])
+exp_ixp_rel = g.exp_ixp(p_arbitrary, origin=x_origin)
+xc = (2, 3, 1, 5)
+x = np.array(list(xc)) - x_origin
+for i in range(4):
+    while x[i] < -L[i] / 2:
+        x[i] += L[i]
+ref = np.exp(1j * np.dot(p_arbitrary, x)) * l_dp[xc]
+val = g.eval(exp_ixp_rel * l_dp)[xc]
+eps = g.norm2(ref - val)
+g.message("Reference value test (arbitrary momentum with origin): ", eps)
+assert eps < 1e-25
+
 ################################################################################
 # Test slice sums
 ################################################################################
 for lattice_object in [
-    g.complex(grid_dp), g.vcomplex(grid_dp, 10),
-    g.vspin(grid_dp), g.vcolor(grid_dp), g.vspincolor(grid_dp),
-    g.mspin(grid_dp), g.mcolor(grid_dp), g.mspincolor(grid_dp),
+    g.complex(grid_dp),
+    g.vcomplex(grid_dp, 10),
+    g.vspin(grid_dp),
+    g.vcolor(grid_dp),
+    g.vspincolor(grid_dp),
+    g.mspin(grid_dp),
+    g.mcolor(grid_dp),
+    g.mspincolor(grid_dp),
 ]:
     g.message(f"Testing slice with random {lattice_object.describe()}")
     obj_list = [g.copy(lattice_object) for _ in range(3)]
@@ -139,19 +159,29 @@ for lattice_object in [
 
     for dimension in range(4):
         tmp = g.slice(obj_list, dimension)
-        full_sliced = np.array([[g.util.tensor_to_value(v) for v in obj] for obj in tmp])
+        full_sliced = np.array(
+            [[g.util.tensor_to_value(v) for v in obj] for obj in tmp]
+        )
 
         for n, obj in enumerate(obj_list):
             tmp = g.slice(obj, dimension)
             sliced = np.array([g.util.tensor_to_value(v) for v in tmp])
-            assert np.allclose(full_sliced[n], sliced, atol=0.0, rtol=1e-15)
+            assert np.allclose(full_sliced[n], sliced, atol=0.0, rtol=1e-13)
 
-            sliced_numpy = np.array([np.sum(obj[
-                slice(0, L[0]) if dimension != 0 else x,
-                slice(0, L[1]) if dimension != 1 else x,
-                slice(0, L[2]) if dimension != 2 else x,
-                slice(0, L[3]) if dimension != 3 else x
-            ], axis=0) for x in range(L[dimension])])
+            sliced_numpy = np.array(
+                [
+                    np.sum(
+                        obj[
+                            slice(0, L[0]) if dimension != 0 else x,
+                            slice(0, L[1]) if dimension != 1 else x,
+                            slice(0, L[2]) if dimension != 2 else x,
+                            slice(0, L[3]) if dimension != 3 else x,
+                        ],
+                        axis=0,
+                    )
+                    for x in range(L[dimension])
+                ]
+            )
             assert np.allclose(full_sliced[n], sliced_numpy, atol=0.0, rtol=1e-12)
 
 
@@ -413,6 +443,53 @@ for i in range(3):
     eps = g.norm2(c[i] - b[i]) / g.norm2(a[i])
     g.message(f"Test basis rotate {i} on host: {eps}")
     assert eps < 1e-13
+
+
+################################################################################
+# Test sparse domain
+################################################################################
+for l in [l_dp, l_sp]:
+    nsparse = int(0.01 * l.grid.gsites / l.grid.Nprocessors)
+    sdomain = g.domain.sparse(
+        l.grid,
+        rng.choice(g.coordinates(l), nsparse),
+    )
+
+    # test project/promote
+    s = g(sdomain.project * l)
+    l_prime = g(sdomain.promote * s)
+
+    # test weight (choice draws with replacement) and its caching
+    sweight = sdomain.weight()
+    sweight2 = sdomain.weight()
+    assert sweight is sweight2
+
+    nsparse_global = g.sum(sweight)
+    assert (
+        abs(nsparse_global - nsparse * l.grid.Nprocessors) < l.grid.precision.eps * 100
+    )
+
+    eps = g.norm2(sweight * (l - l_prime)) ** 0.5
+    g.message(f"Test sparse reconstruction: {eps}")
+    assert eps < l.grid.precision.eps * 100
+
+    ft_original = g.sum(sweight * exp_ixp * l)
+    ft_sparse = g.sum(sdomain.exp_ixp(p) * s)
+    eps = g.norm2(ft_original - ft_sparse) ** 0.5
+    g.message(f"Test sparse momentum implementation: {eps}")
+    assert eps < l.grid.precision.eps * 1e4
+
+    ft_original = g.sum(sweight * exp_ixp_rel * l)
+    ft_sparse = g.sum(sdomain.exp_ixp(p_arbitrary, origin=x_origin) * s)
+    eps = g.norm2(ft_original - ft_sparse) ** 0.5
+    g.message(f"Test sparse momentum implementation (arbitrary with origin): {eps}")
+    assert eps < l.grid.precision.eps * 1e4
+
+    sl_original = g.slice(sweight * l, 3)
+    sl_sparse = sdomain.slice(s, 3)
+    eps = sum([g.norm2(x - y) ** 0.5 for x, y in zip(sl_original, sl_sparse)])
+    g.message(f"Test sparse slice: {eps}")
+    assert eps < l.grid.precision.eps * 1e3
 
 ################################################################################
 # Test mem_report
