@@ -159,7 +159,7 @@ PyObject* cgpt_slice_trace(const PVector<Lattice<T>>& basis, int dim) {
 
 // sliceSum from Grid but with vector of lattices as input and traces as output, for DA
 template<class vobj>
-inline void cgpt_slice_trace_DA(const PVector<Lattice<vobj>> &Data,
+inline void cgpt_slice_trace_DA_sum(const PVector<Lattice<vobj>> &Data,
                             const PVector<Lattice<vobj>> &Data2,
                             const PVector<LatticeComplex> &mom,
                             std::vector<iSinglet<ComplexD>> &result,
@@ -283,7 +283,7 @@ PyObject* cgpt_slice_traceDA(const PVector<Lattice<T>>& lhs, const PVector<Latti
   std::vector<sobj> result;
   // std::vector<scalar_type> result;
 //  printf("in cgpt_slice_trace1, before going into actual function \n");
-  cgpt_slice_trace_sumsDA(lhs, rhs, mom, result, dim);
+  cgpt_slice_trace_DA_sum(lhs, rhs, mom, result, dim);
 
   int Nbasis = lhs.size();
   int Nmom = mom.size();
@@ -323,7 +323,7 @@ PyObject* cgpt_slice_traceDA(const PVector<Lattice<T>>& lhs, const PVector<Latti
 
 // sliceSum from Grid but with vector of lattices as input and traces as output, for DA
 template<class vobj>
-inline void cgpt_slice_trace_QPDF(const PVector<Lattice<vobj>> &Data,
+inline void cgpt_slice_trace_QPDF_sum(const PVector<Lattice<vobj>> &Data,
                             const PVector<Lattice<vobj>> &Data2,
                             const PVector<LatticeComplex> &mom,
                             std::vector<iSinglet<ComplexD>> &result,
@@ -447,7 +447,7 @@ PyObject* cgpt_slice_traceQPDF(const PVector<Lattice<T>>& lhs, const PVector<Lat
   std::vector<sobj> result;
   // std::vector<scalar_type> result;
 //  printf("in cgpt_slice_trace1, before going into actual function \n");
-  cgpt_slice_trace_sumsQPDF(lhs, rhs, mom, result, dim);
+  cgpt_slice_trace_QPDF_sum(lhs, rhs, mom, result, dim);
 
   int Nbasis = rhs.size();
   int Nmom = mom.size();
