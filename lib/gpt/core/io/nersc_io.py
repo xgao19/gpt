@@ -70,6 +70,12 @@ class nersc_io:
         elif self.floating_point == "IEEE64LITTLE" or self.floating_point == "IEEE64":
             self.munge = self.munge_ieee64little
             self.precision = gpt.double
+        elif self.floating_point == "IEEE32BIG":
+            self.munge = self.munge_ieee32big
+            self.precision = gpt.single
+        elif self.floating_point == "IEEE32LITTLE" or self.floating_point == "IEEE32":
+            self.munge = self.munge_ieee32little
+            self.precision = gpt.single
         else:
             gpt.message("Warning: unknown floating point format {self.floating_point}")
             return False
@@ -110,6 +116,16 @@ class nersc_io:
     def munge_ieee64little(self, data):
         if sys.byteorder == "big":
             cgpt.munge_byte_order(data, data, 8)
+        return data
+
+    def munge_ieee32big(self, data):
+        if sys.byteorder == "little":
+            cgpt.munge_byte_order(data, data, 4)
+        return data
+
+    def munge_ieee32little(self, data):
+        if sys.byteorder == "big":
+            cgpt.munge_byte_order(data, data, 4)
         return data
 
     def reconstruct_none(self, data):
@@ -211,9 +227,9 @@ class nersc_io:
         P_comp = gpt.qcd.gauge.plaquette(l)
         P_exp = float(self.metadata["PLAQUETTE"])
         P_digits = len(self.metadata["PLAQUETTE"].split(".")[1])
-        P_eps = abs(P_comp / P_exp - 1.0)
-        P_eps_threshold = 10.0 ** (-P_digits + 1)
-        P_eps_threshold = max([1e-9, P_eps_threshold])
+        P_eps = abs(P_comp - P_exp)
+        P_eps_threshold = 10.0 ** (-P_digits + 2)
+        P_eps_threshold = max([1e2 * self.precision.eps, P_eps_threshold])
         assert P_eps < P_eps_threshold
 
         L_comp = (
@@ -224,9 +240,9 @@ class nersc_io:
         )
         L_exp = float(self.metadata["LINK_TRACE"])
         L_digits = len(self.metadata["LINK_TRACE"].split(".")[1].lower().split("e")[0])
-        L_eps_threshold = 10.0 ** (-L_digits + 1)
-        L_eps_threshold = max([1e-9, L_eps_threshold])
-        L_eps = abs(L_comp / L_exp - 1.0)
+        L_eps_threshold = 10.0 ** (-L_digits + 2)
+        L_eps_threshold = max([1e2 * self.precision.eps, L_eps_threshold])
+        L_eps = abs(L_comp - L_exp)
         assert L_eps < L_eps_threshold
 
         return l

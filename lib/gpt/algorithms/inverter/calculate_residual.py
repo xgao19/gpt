@@ -28,20 +28,23 @@ class calculate_residual:
             for i in range(len(dst)):
                 eps = g.norm2(mat * dst[i] - src[i]) ** 0.5
                 nrm = g.norm2(src[i]) ** 0.5
-                g.message(
-                    f"{self.tag}| mat * dst[{i}] - src[{i}] | / | src | = {eps/nrm}, | src[{i}] | = {nrm}"
-                )
+                if nrm != 0.0:
+                    g.message(
+                        f"{self.tag}| mat * dst[{i}] - src[{i}] | / | src | = {eps/nrm}, | src[{i}] | = {nrm}"
+                    )
+                else:
+                    g.message(
+                        f"{self.tag}| mat * dst[{i}] - src[{i}] | = {eps}, | src[{i}] | = {nrm}"
+                    )
 
-        otype, grid, cb = None, None, None
+        vector_space = None
         if isinstance(mat, g.matrix_operator):
-            otype, grid, cb = mat.otype, mat.grid, mat.cb
+            vector_space = mat.vector_space
 
         return g.matrix_operator(
             mat=inv,
             inv_mat=mat,
-            otype=otype,
+            vector_space=vector_space,
             accept_guess=(True, False),
-            grid=grid,
-            cb=cb,
             accept_list=True,
         )

@@ -34,6 +34,7 @@ mobius_params = {
 
 qm = g.qcd.fermion.mobius(g.qcd.gauge.unit(grid), mobius_params)
 
+
 # test operator update
 start = g.vspincolor(qm.F_grid)
 rng.cnormal(start)
@@ -130,8 +131,8 @@ slv_5d = inv.preconditioned(pc.eo2_ne(), cg)
 slv_5d_kappa = inv.preconditioned(pc.eo2_kappa_ne(), cg_kappa)
 slv_5d_e = inv.preconditioned(pc.eo2_ne(), cg_e)
 
-# To calculate Jq5 which is necessary for the residual mass, we need a solver for the 5d propgator
-slv_qm_5d = slv_5d(qm)
+# To calculate Jq5 which is necessary for the residual mass, we need a solver for the bulk propgator
+slv_qm_bulk = qm.bulk_propagator(slv_5d)
 slv_qm_e = qm.propagator(slv_5d_e)
 slv_qz = qz.propagator(slv_5d)
 slv_qz_kappa = qz.propagator(slv_5d_kappa)
@@ -168,8 +169,9 @@ dst_qz = g.mspincolor(grid)
 dst_qz_kappa = g.mspincolor(grid)
 
 # Solve for the 5d and 4d propagator
-dst_qm_5d = g(slv_qm_5d * qm.ImportPhysicalFermionSource * src)
-dst_qm @= qm.ExportPhysicalFermionSolution * dst_qm_5d
+# qm.bulk_propagator_to_propagator * qm.bulk_propagator(slv) == qm.propagator(slv)
+dst_qm_bulk = g(slv_qm_bulk.grouped(3) * src)
+dst_qm @= qm.bulk_propagator_to_propagator * dst_qm_bulk
 
 dst_qz @= slv_qz * src
 dst_qz_kappa @= slv_qz_kappa * src
@@ -181,7 +183,7 @@ assert eps2 < 1e-6
 assert len(cg.history) > len(cg_kappa.history)
 
 # calculate J5q
-p = qm.J5q(dst_qm_5d)
+p = qm.J5q(dst_qm_bulk)
 J5q = g.slice(g.trace(p * g.adj(p)), 3)
 
 g.message("J5q:")
@@ -220,4 +222,158 @@ eps_qz = eps_qz ** 0.5 / len(correlator_ref)
 g.message("Test results: %g %g" % (eps_qm, eps_qz))
 assert eps_qm < 1e-5
 assert eps_qz < 5e-4
-g.message("Test successful")
+
+# test G(m1) - G(m2) = (m2 - m1) * G(m1) * G(m2)
+m1 = 0.11
+m2 = 0.24
+qm1 = g.qcd.fermion.mobius(
+    U, mass=m1, M5=1.8, b=1.5, c=0.5, Ls=6, boundary_phases=[1, 1, 1, -1]
+)
+qm2 = g.qcd.fermion.mobius(
+    U, mass=m2, M5=1.8, b=1.5, c=0.5, Ls=6, boundary_phases=[1, 1, 1, -1]
+)
+G1 = qm1.propagator(slv_5d_e)
+G2 = qm2.propagator(slv_5d_e)
+
+eps2 = g.norm2((m2 - m1) * G1 * G2 * src_sc - (G1 * src_sc - G2 * src_sc)) / g.norm2(src_sc)
+g.message(f"Test vector mass behavior: {eps2}")
+assert eps2 < 1e-13
+
+
+# now test axial mass behavior; first test action at double precision
+m0 = 0.35
+m1 = 0.11
+m2 = 0.24
+
+U = g.qcd.gauge.random(g.grid([8, 8, 8, 8], g.double), rng, scale=2.0)
+qm1 = g.qcd.fermion.mobius(
+    U,
+    mass_plus=m0,
+    mass_minus=m1,
+    M5=1.8,
+    b=1.5,
+    c=0.5,
+    Ls=12,
+    boundary_phases=[1, 1, 1, -1],
+)
+
+# reference implementation
+def D_DWF(dst, src, b, c, mass_plus, mass_minus):
+
+    D_W = g.qcd.fermion.wilson_clover(
+        U,
+        mass=-1.8,
+        csw_r=0.0,
+        csw_t=0.0,
+        nu=1.0,
+        xi_0=1.0,
+        isAnisotropic=False,
+        boundary_phases=[1, 1, 1, -1],
+    )
+
+    src_s = g.separate(src, 0)
+    dst_s = [g.lattice(s) for s in src_s]
+
+    Ls = len(src_s)
+
+    src_plus_s = []
+    src_minus_s = []
+    for s in range(Ls):
+        src_plus_s.append(g(0.5 * src_s[s] + 0.5 * g.gamma[5] * src_s[s]))
+        src_minus_s.append(g(0.5 * src_s[s] - 0.5 * g.gamma[5] * src_s[s]))
+    for d in dst_s:
+        d[:] = 0
+    for s in range(Ls):
+        dst_s[s] += b * D_W * src_s[s] + src_s[s]
+    for s in range(1, Ls):
+        dst_s[s] += c * D_W * src_plus_s[s - 1] - src_plus_s[s - 1]
+    for s in range(0, Ls - 1):
+        dst_s[s] += c * D_W * src_minus_s[s + 1] - src_minus_s[s + 1]
+    dst_s[0] -= mass_plus * (c * D_W * src_plus_s[Ls - 1] - src_plus_s[Ls - 1])
+    dst_s[Ls - 1] -= mass_minus * (c * D_W * src_minus_s[0] - src_minus_s[0])
+    dst @= g.merge(dst_s, 0)
+
+
+vsrc = rng.cnormal(g.vspincolor(qm1.F_grid))
+vdst = g(qm1 * vsrc)
+vdst2 = g.lattice(vdst)
+D_DWF(vdst2, vsrc, 1.5, 0.5, m0, m1)
+eps2 = g.norm2(vdst2 - vdst) / g.norm2(vdst)
+g.message(f"Test DWF implementation with separate left and right mass: {eps2}")
+assert eps2 < 1e-28
+
+
+# remaining tests again with single-precision for speed (did run once in double-precision)
+U = g.convert(U, g.single)
+
+qm1 = g.qcd.fermion.mobius(
+    U,
+    mass_plus=m0,
+    mass_minus=m1,
+    M5=1.8,
+    b=1.5,
+    c=0.5,
+    Ls=6,
+    boundary_phases=[1, 1, 1, -1],
+)
+qm2 = g.qcd.fermion.mobius(
+    U,
+    mass_plus=m0,
+    mass_minus=m2,
+    M5=1.8,
+    b=1.5,
+    c=0.5,
+    Ls=6,
+    boundary_phases=[1, 1, 1, -1],
+)
+
+G1 = qm1.propagator(slv_5d_e)
+G2 = qm2.propagator(slv_5d_e)
+
+Pplus = (g.gamma["I"].tensor() + g.gamma[5].tensor()) * 0.5
+Pminus = (g.gamma["I"].tensor() - g.gamma[5].tensor()) * 0.5
+
+# test left-handed axial behavior:
+# G(m,m1) = (G0 + m Pp + m1 Pm)^-1
+# ->
+# G(m,m1)^-1 G(m,m2) = (G0 + m Pp + m1 Pm) (G0 + m Pp + m2 Pm)^-1
+#                    = (G0 + m Pp + m2 Pm) (G0 + m Pp + m2 Pm)^-1 + (m1-m2) Pm (G0 + m Pp + m2 Pm)^-1
+#                    = 1 + (m1-m2) Pm (G0 + m Pp + m2 Pm)^-1
+# ->
+# G(m,m2) - G(m,m1) = (m1 - m2) G(m,m1) Pm G(m,m2)
+# or
+# G(m,m1) - G(m,m2) = (m2 - m1) G(m,m2) Pm G(m,m1)
+eps2 = g.norm2((m2 - m1) * G2 * Pminus * G1 * src_sc - (G1 * src_sc - G2 * src_sc)) / g.norm2(
+    src_sc
+)
+g.message(f"Test axial mass behavior: {eps2}")
+assert eps2 < 1e-13
+
+# G(m1,m) - G(m2,m) = (m2 - m1) G(m2,m) Pp G(m1,m)
+qm1 = g.qcd.fermion.mobius(
+    U,
+    mass_plus=m1,
+    mass_minus=m0,
+    M5=1.8,
+    b=1.5,
+    c=0.5,
+    Ls=6,
+    boundary_phases=[1, 1, 1, -1],
+)
+qm2 = g.qcd.fermion.mobius(
+    U,
+    mass_plus=m2,
+    mass_minus=m0,
+    M5=1.8,
+    b=1.5,
+    c=0.5,
+    Ls=6,
+    boundary_phases=[1, 1, 1, -1],
+)
+
+G1 = qm1.propagator(slv_5d_e)
+G2 = qm2.propagator(slv_5d_e)
+
+eps2 = g.norm2((m2 - m1) * G2 * Pplus * G1 * src_sc - (G1 * src_sc - G2 * src_sc)) / g.norm2(src_sc)
+g.message(f"Test axial mass behavior: {eps2}")
+assert eps2 < 1e-13

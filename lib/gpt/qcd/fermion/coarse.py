@@ -229,16 +229,16 @@ def prefactor_dagger(A, v_idx=None):
     )
 
 
-def nearest_neighbor_operator(fine_matrix, coarse_grid, basis, params):
+def nearest_neighbor_operator(fine_matrix, coarse_grid, basis, params, daggered=False):
     A = [gpt.mcomplex(coarse_grid, len(basis)) for i in range(9)]
+
+    assert not daggered
 
     create_links(
         A, fine_matrix, basis, make_hermitian=params["make_hermitian"], save_links=True
     )
 
     level = (
-        1
-        if isinstance(fine_matrix.otype[0], gpt.ot_matrix_complex_additive_group)
-        else 0
+        1 if isinstance(fine_matrix.otype, gpt.ot_matrix_complex_additive_group) else 0
     )
     return gpt.qcd.fermion.coarse_fermion(A, level=level)

@@ -27,8 +27,8 @@ p = {
     "kappa": 0.137,
     "csw_r": 0.0,
     "csw_t": 0.0,
-    "xi_0": 1,
-    "nu": 1,
+    "xi_0": 1.0,
+    "nu": 1.0,
     "isAnisotropic": False,
     "boundary_phases": [cmath.exp(1j), cmath.exp(2j), cmath.exp(3j), cmath.exp(4j)],
 }
@@ -121,6 +121,16 @@ if True:
 
 dst = dst_eo2
 
+# invert daggered
+v1 = rng.cnormal(g.vspincolor(grid))
+v2 = rng.cnormal(g.vspincolor(grid))
+w_v1 = g(inv.preconditioned(pc.eo1_ne(), cg)(w) * v1)
+wadj_v2 = g(inv.preconditioned(pc.eo1_ne(), cg)(w.adj()) * v2)
+
+eps = abs(g.inner_product(v2, w_v1) / g.inner_product(v1, wadj_v2).conjugate() - 1.0)
+g.message(f"Test inv(dag(w)): {eps}")
+assert eps < 1e-5
+
 # two-point
 correlator = g.slice(g.trace(dst * g.adj(dst)), 3)
 
@@ -152,6 +162,29 @@ eps = np.linalg.norm(np.array(correlator) - np.array(correlator_ref))
 g.message("Expected correlator eps: ", eps)
 assert eps < 1e-5
 
+# test conserved current
+def divergence(f, current):
+    resN = g.lattice(f)
+    resN[:] = 0
+
+    b = g(g.gamma[5] * g.adj(f) * g.gamma[5])
+    for mu in range(4):
+        c_mu = current(f, b, mu)
+        resN += c_mu - g.cshift(c_mu, mu, -1)
+
+    return g.norm2(resN)
+
+
+def local_current(f, b, mu):
+    return g(g.gamma[mu] * f * b)
+
+
+div_J = divergence(dst, w.conserved_vector_current)
+assert div_J < 1e-13
+g.message(f"Divergence of conserved Wilson current {div_J}")
+
+div_J = divergence(dst, local_current)
+g.message(f"Divergence of local current {div_J}")
 
 # split grid solver check
 slv_split_eo1 = w.propagator(
@@ -288,6 +321,9 @@ test_suite = {
         "matrices": {
             "": [(-2424.048033434305 + 10557.661684178218j)],
             ".Mdiag": [(2643.396577965267 + 6550.259431381319j)],
+            ".ImportPhysicalFermionSource": [
+                (4064.7879718582053 - 1357.0856808000196j)
+            ],
         },
     },
     "mobius": {
@@ -303,6 +339,23 @@ test_suite = {
         "matrices": {
             "": [(-8693.09425573421 - 4130.7793316734915j)],
             ".Mdiag": [(-4966.960264746144 - 2525.83968136146j)],
+            ".ImportPhysicalFermionSource": [(-97.93443075273976 - 690.6405168964976j)],
+        },
+    },
+    "mobius_axial_mass": {
+        "fermion": g.qcd.fermion.mobius,
+        "params": {
+            "mass_plus": 0.08,
+            "mass_minus": 0.11,
+            "M5": 1.8,
+            "b": 1.5,
+            "c": 0.5,
+            "Ls": 12,
+            "boundary_phases": [1.0, -1.0, 1.0, -1.0],
+        },
+        "matrices": {
+            "": [(-8690.547330400455 - 4127.148886222195j)],
+            ".Mdiag": [(-4967.102993398692 - 2525.589904941078j)],
         },
     },
     "wilson": {
@@ -374,16 +427,16 @@ def verify_single_versus_double_precision(rng, fermion_dp, fermion_sp):
                     g.message(f"Verify single <> double for {atag}: {eps}")
                     assert eps < eps_ref
                 # then test adjoint matrix
-                ref_list = a_dp.adj()(lhs_dp, rhs_dp)
-                cmp_list = g.convert(a_sp.adj()(lhs_sp, rhs_sp), g.double)
+                ref_list = a_dp.adj()(rhs_dp, lhs_dp)
+                cmp_list = g.convert(a_sp.adj()(rhs_sp, lhs_sp), g.double)
                 for r, c in zip(ref_list, cmp_list):
                     eps = g.norm2(r - c) ** 0.5 / g.norm2(r) ** 0.5
                     g.message(f"Verify single <> double for {atag}.adj(): {eps}")
                     assert eps < eps_ref
-        elif isinstance(a_dp, g.matrix_operator) and a_dp.otype[1] is not None:
+        elif isinstance(a_dp, g.matrix_operator):
             a_sp = getattr(fermion_sp, atag)
-            rhs_dp = rng.cnormal(g.lattice(a_dp.grid[1], a_dp.otype[1]))
-            lhs_dp = rng.cnormal(g.lattice(a_dp.grid[0], a_dp.otype[0]))
+            rhs_dp = rng.cnormal(a_dp.vector_space[1].lattice())
+            lhs_dp = rng.cnormal(a_dp.vector_space[0].lattice())
             if rhs_dp.grid.cb.n != 1:
                 # for now test only odd cb
                 rhs_dp.checkerboard(g.odd)
@@ -425,6 +478,73 @@ def verify_single_versus_double_precision(rng, fermion_dp, fermion_sp):
                     assert eps < eps_ref
 
 
+def verify_daggered(rng, fermion, fermion_daggered):
+    eps_ref = fermion.F_grid.precision.eps * finger_print_tolerance
+    for atag in fermion.__dict__.keys():
+        a = getattr(fermion, atag)
+        if isinstance(a, g.projected_matrix_operator):
+            a_daggered = getattr(fermion_daggered, atag)
+            rhs = rng.cnormal(g.lattice(a.grid[1], a.otype[1]))
+            lhs = rng.cnormal(g.lattice(a.grid[0], a.otype[0]))
+            if rhs.grid.cb.n == 1:
+                parities = [(g.full, g.full)]
+            elif a.parity == g.even:
+                parities = [(g.even, g.even), (g.odd, g.odd)]
+            elif a.parity == g.odd:
+                parities = [(g.odd, g.even), (g.even, g.odd)]
+            else:
+                assert False
+            for lp, rp in parities:
+                if lp != g.full:
+                    rhs.checkerboard(rp)
+                    lhs.checkerboard(lp)
+                # first test matrix
+                ref_list = a(lhs, rhs)
+                cmp_list = a_daggered.adj()(lhs, rhs)
+                for r, c in zip(ref_list, cmp_list):
+                    eps = g.norm2(r - c) ** 0.5 / g.norm2(r) ** 0.5
+                    g.message(f"Verify operator <> daggered for {atag}: {eps}")
+                    assert eps < eps_ref
+                # then test adjoint matrix
+                ref_list = a.adj()(rhs, lhs)
+                cmp_list = a_daggered(rhs, lhs)
+                for r, c in zip(ref_list, cmp_list):
+                    eps = g.norm2(r - c) ** 0.5 / g.norm2(r) ** 0.5
+                    g.message(f"Verify operator <> daggered for {atag}.adj(): {eps}")
+                    assert eps < eps_ref
+
+        elif isinstance(a, g.matrix_operator) and a.adj_mat is not None:
+            a_daggered = getattr(fermion_daggered, atag)
+            rhs = rng.cnormal(a.vector_space[1].lattice())
+            lhs = rng.cnormal(a.vector_space[0].lattice())
+            if rhs.grid.cb.n != 1:
+                # for now test only odd cb
+                rhs.checkerboard(g.odd)
+                lhs.checkerboard(g.odd)
+
+            # first test matrix
+            ref = a(rhs)
+            eps = g.norm2(ref - a_daggered.adj()(rhs)) ** 0.5 / g.norm2(ref) ** 0.5
+            g.message(f"Verify operator <> daggered for {atag}: {eps}")
+            assert eps < eps_ref
+            ref = a.adj()(lhs)
+            eps = g.norm2(ref - a_daggered(lhs)) ** 0.5 / g.norm2(ref) ** 0.5
+            g.message(f"Verify operator <> daggered for {atag}.adj(): {eps}")
+            assert eps < eps_ref
+            if a.inv_mat is not None:
+                ref = a.inv()(lhs)
+                eps = (
+                    g.norm2(ref - a_daggered.adj().inv()(lhs)) ** 0.5
+                    / g.norm2(ref) ** 0.5
+                )
+                g.message(f"Verify operator <> daggered for {atag}.inv(): {eps}")
+                assert eps < eps_ref
+                ref = a.adj().inv()(lhs)
+                eps = g.norm2(ref - a_daggered.inv()(lhs)) ** 0.5 / g.norm2(ref) ** 0.5
+                g.message(f"Verify operator <> daggered for {atag}.adj().inv(): {eps}")
+                assert eps < eps_ref
+
+
 def verify_projected_even_odd(M, Meo, dst_p, src_p, src):
     src_proj_p = g.lattice(src)
     src_proj_p[:] = 0
@@ -451,6 +571,9 @@ def get_matrix(f, t):
 
 def verify_matrix_element(fermion, dst, src, tag):
     mat = get_matrix(fermion_dp, tag)
+    if isinstance(src, dict):
+        src = src[mat.vector_space[1].grid]
+        dst = dst[mat.vector_space[0].grid]
     src_prime = g.eval(mat * src)
     dst.checkerboard(src_prime.checkerboard())
     X = g.inner_product(dst, src_prime)
@@ -470,7 +593,7 @@ def verify_matrix_element(fermion, dst, src, tag):
             g.message(f"Test adj(inv({tag})): {eps}")
             assert eps < eps_ref
     # do even/odd tests
-    even_odd_operators = {"": ("Mooee", "Meooe")}
+    even_odd_operators = {"": (".Mooee", ".Meooe")}
     if tag in even_odd_operators:
         g.message(f"Test eo versions of {tag}")
         grid_rb = fermion.F_grid_eo
@@ -490,7 +613,11 @@ def verify_matrix_element(fermion, dst, src, tag):
             verify_matrix_element(fermion, dst_p, src_p, tag_Meooe)
             verify_projected_even_odd(mat, mat_Meooe, dst_p, src_p, src)
     # perform derivative tests
-    projected_gradient_operators = {"": "M_projected_gradient"}
+    projected_gradient_operators = {
+        "": "M_projected_gradient",
+        ".Dhop": "Dhop_projected_gradient",
+        ".ImportPhysicalFermionSource": "ImportPhysicalFermionSource_projected_gradient",
+    }
     if tag in projected_gradient_operators and isinstance(
         fermion, g.qcd.fermion.differentiable_fine_operator
     ):
@@ -506,7 +633,7 @@ def verify_matrix_element(fermion, dst, src, tag):
             def gradient(self, Uprime, dUprime):
                 assert dUprime == Uprime
                 return [
-                    g.eval(a + b)
+                    g.qcd.gauge.project.traceless_hermitian(g.eval(a + b))
                     for a, b in zip(mat_pg(dst_pg, src), mat_pg.adj()(src, dst_pg))
                 ]
 
@@ -525,7 +652,9 @@ def verify_matrix_element(fermion, dst, src, tag):
 
                 def gradient(self, Uprime, dUprime):
                     assert dUprime == Uprime
-                    return mat_pg(fermion.G5 * src, src)
+                    return g.qcd.gauge.project.traceless_hermitian(
+                        mat_pg(fermion.G5 * src, src)
+                    )
 
             dfv = df()
             dfv.assert_gradient_error(rng, U, U, 1e-3, 1e-6)
@@ -543,20 +672,22 @@ def verify_matrix_element(fermion, dst, src, tag):
 
                 def gradient(self, Uprime, dUprime):
                     assert dUprime == Uprime
-                    return mat_pg.adj()(src, fermion.G5 * src)
+                    return g.qcd.gauge.project.traceless_hermitian(
+                        mat_pg.adj()(src, fermion.G5 * src)
+                    )
 
             dfv = df()
             dfv.assert_gradient_error(rng, U, U, 1e-3, 1e-6)
 
     # perform even-odd derivative tests
-    projected_gradient_operators = {"Meooe": "Meooe_projected_gradient"}
+    projected_gradient_operators = {".Meooe": "Meooe_projected_gradient"}
     if tag in projected_gradient_operators and isinstance(
         fermion, g.qcd.fermion.differentiable_fine_operator
     ):
         # Test projected gradient for src_p^dag M^dag M src_p
         g.message(f"Test projected_gradient of {tag} via src^dag M^dag M src")
         mat_pg = get_matrix(fermion, projected_gradient_operators[tag])
-        src_p = g.lattice(fermion.F_grid_eo, fermion.otype[1])
+        src_p = g.lattice(fermion.F_grid_eo, fermion.otype)
 
         for parity in [g.even, g.odd]:
             g.pick_checkerboard(parity, src_p, src)
@@ -572,7 +703,9 @@ def verify_matrix_element(fermion, dst, src, tag):
                     for r, x in zip(
                         R + R, mat_pg(dst_p, src_p) + mat_pg.adj()(src_p, dst_p)
                     ):
-                        g.set_checkerboard(r, x)
+                        g.set_checkerboard(
+                            r, g.qcd.gauge.project.traceless_hermitian(x)
+                        )
                     return R
 
         dfv = df()
@@ -598,7 +731,7 @@ for name in test_suite:
 
     # params
     test = test_suite[name]
-    g.message(f"Starting test suite for {name}")
+    g.message(f"\n\nStarting test suite for {name}")
 
     # create fermion
     fermion_dp = test["fermion"](U, test["params"])
@@ -613,14 +746,18 @@ for name in test_suite:
         fermion_dp = test["fermion"](U, test["params"])
 
     # do full tests
-    grid = fermion_dp.F_grid
-    src = rng.cnormal(g.vspincolor(grid))
-    dst = rng.cnormal(g.vspincolor(grid))
+    src = {}
+    dst = {}
+    for grid in [fermion_dp.F_grid, fermion_dp.U_grid]:
+        if grid not in src:  # if F_grid != U_grid
+            src[grid] = rng.cnormal(g.vspincolor(grid))
+            dst[grid] = rng.cnormal(g.vspincolor(grid))
 
     # apply open boundaries to fields if necessary
     if test["params"]["boundary_phases"][-1] == 0.0:
-        g.qcd.fermion.apply_open_boundaries(src)
-        g.qcd.fermion.apply_open_boundaries(dst)
+        for grid in src:
+            g.qcd.fermion.apply_open_boundaries(src[grid])
+            g.qcd.fermion.apply_open_boundaries(dst[grid])
 
     for matrix in test["matrices"]:
         g.message(
@@ -646,3 +783,6 @@ for name in test_suite:
     if isinstance(fermion_dp, g.qcd.fermion.fine_operator):
         fermion_sp = fermion_dp.converted(g.single)
         verify_single_versus_double_precision(rng, fermion_dp, fermion_sp)
+
+    # test daggering entire fermion operator
+    verify_daggered(rng, fermion_dp, fermion_dp.adj())
