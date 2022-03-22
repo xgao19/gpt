@@ -20,38 +20,8 @@
 
 import gpt as g
 from gpt.core.group import differentiable_functional
+from gpt.qcd.pseudofermion.action.base import action_base
 from gpt.qcd.pseudofermion.action.schur_differentiable_operator import *
-
-
-class action_base(differentiable_functional):
-    def __init__(self, M, inverter, operator):
-        self.M = g.core.util.to_list(M)
-        self.inverter = inverter
-        self.operator = operator
-
-    def _updated(self, fields):
-        U = fields[0:-1]
-        psi = fields[-1]
-        return [m.updated(U) for m in self.M] + [U, psi]
-
-    def _allocate_force(self, U):
-        frc = g.group.cartesian(U)
-        for f in frc:
-            f[:] = 0
-        return frc
-
-    def _accumulate(self, frc, frc1, sign):
-        for f, f1 in zip(frc, frc1):
-            f += sign * f1
-
-    def __call__(self, fields):
-        raise NotImplementedError()
-
-    def draw(self, fields, rng):
-        raise NotImplementedError()
-
-    def gradient(self, fields, dfields):
-        raise NotImplementedError()
 
 
 # S = phi^dag Mdag^-1 M^-1 phi = phi^dag (M Mdag)^-1 phi = (psi, psi)
@@ -71,7 +41,7 @@ class two_flavor_base(action_base):
         M, U, phi = self._updated(fields)
 
         eta = g.lattice(phi)
-        rng.normal(eta, sigma=2.0 ** -0.5)  # 1/sqrt(2)
+        rng.cnormal(eta, sigma=2.0 ** -0.5)  # 1/sqrt(2)
 
         phi @= self.operator.M(M) * eta
         return g.norm2(eta)
@@ -92,9 +62,9 @@ class two_flavor_base(action_base):
         for f in dfields:
             mu = fields.index(f)
             if mu < len(fields) - 1:
-                dS.append(frc[mu])
+                dS.append(g.qcd.gauge.project.traceless_hermitian(frc[mu]))
             else:
-                raise Expcetion("not implemented")
+                raise Exception("not implemented")
         return dS
 
 
@@ -111,7 +81,7 @@ class two_flavor(two_flavor_base):
 
 class two_flavor_evenodd_schur(two_flavor_base):
     def __init__(self, M, inverter):
-        super().__init__(M, inverter, MMdag_evenodd(g.odd))
+        super().__init__(M, inverter, MMdag_evenodd())
 
 
 class two_flavor_evenodd(differentiable_functional):
@@ -155,7 +125,7 @@ class two_flavor_evenodd(differentiable_functional):
         if count == 0:
             return self.two_flavor_evenodd_schur.gradient(U + [phi_o], dfields)
         else:
-            raise Expcetion("not implemented")
+            raise Exception("not implemented")
 
 
 # det (M1 M1dag/M2 M2dag) -> S = phi^dag M2dag (M1 M1dag)^-1 M2 phi
@@ -179,8 +149,10 @@ class two_flavor_ratio_base(action_base):
         M1, M2, U, phi = self._updated(fields)
 
         eta = g.lattice(phi)
-        rng.normal(eta, sigma=2.0 ** -0.5)  # 1/sqrt(2)
+        rng.cnormal(eta, sigma=2.0 ** -0.5)  # 1/sqrt(2)
 
+        # phi^dag M2dag (M1 M1dag)^-1 M2 phi
+        # eta = M1^-1 M2 phi
         chi = g.lattice(phi)
         chi @= self.inverter(self.operator.MMdag(M2)) * self.operator.M(M1) * eta
         phi @= self.operator.Mdag(M2) * chi
@@ -206,9 +178,9 @@ class two_flavor_ratio_base(action_base):
         for f in dfields:
             mu = fields.index(f)
             if mu < len(fields) - 1:
-                dS.append(frc[mu])
+                dS.append(g.qcd.gauge.project.traceless_hermitian(frc[mu]))
             else:
-                raise Expcetion("not implemented")
+                raise Exception("not implemented")
         return dS
 
 
@@ -219,4 +191,4 @@ class two_flavor_ratio(two_flavor_ratio_base):
 
 class two_flavor_ratio_evenodd_schur(two_flavor_ratio_base):
     def __init__(self, M, inverter):
-        super().__init__(M, inverter, MMdag_evenodd(g.odd))
+        super().__init__(M, inverter, MMdag_evenodd())

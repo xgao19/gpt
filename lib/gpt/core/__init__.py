@@ -23,6 +23,7 @@ from gpt.core.expr import expr, factor, expr_unary, factor_unary, expr_eval
 from gpt.core.lattice import lattice, get_mem_book
 from gpt.core.peekpoke import map_key
 from gpt.core.tensor import tensor
+from gpt.core.epsilon import epsilon, sign_of_permutation
 from gpt.core.gamma import gamma, gamma_base
 from gpt.core.time import time, timer
 from gpt.core.log import message
@@ -93,9 +94,11 @@ from gpt.core.mem import mem_info, mem_report, accelerator, host
 from gpt.core.merge import *
 from gpt.core.split import *
 import gpt.core.domain
+import gpt.core.vector_space
 import gpt.core.covariant
 import gpt.core.util
 import gpt.core.block
 import gpt.core.matrix
 import gpt.core.component
 import gpt.core.group
+import gpt.core.sparse_tensor
