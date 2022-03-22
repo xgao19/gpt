@@ -21,4 +21,6 @@ import gpt.qcd.gauge
 import gpt.qcd.fermion
 import gpt.qcd.scalar
 import gpt.qcd.pseudofermion
+import gpt.qcd.baryon
 from gpt.qcd.utils import ferm_to_prop, prop_to_ferm
+from gpt.qcd.wick import wick
