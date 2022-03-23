@@ -4,36 +4,40 @@ static const Real epsilon_sgn[6] = {1.,1.,1.,-1.,-1.,-1.};
 
 
 
-template <class mobj>
-vComplexD Proton2ptSite(const mobj &D, const int polarization){
+template <class mobj, class robj>
+void Proton2ptSite(const mobj &D, robj &result, const int polarization){
 
+    Gamma g1(Gamma::Algebra::GammaX);
+    Gamma g2(Gamma::Algebra::GammaY);
+    Gamma g3(Gamma::Algebra::GammaZ);
     Gamma g4(Gamma::Algebra::GammaT);
     Gamma g5(Gamma::Algebra::Gamma5);
-    Gamma g2(Gamma::Algebra::GammaY);
 
-    auto G = Complex(0,1) * g2 * g4 * g5;
+    auto G = g2 * g4 * g5;
 
+    auto parD = 0.25*(D + g4*D);
+    auto PD = parD;
+    //vComplexD result = 0.0;
     if (polarization==0)
     {
         //polatization projector
         // Notes: P_+,Sz+, QLUA: tpol_posSzplus
-        auto P = 0.5 * (1 + g4) * (1 - g1 * g2);   
+        PD = PD - g1 * g2 * parD;   
     }
     else if (polarization==1)
     {
         //polatization projector
         // Notes: P_+,Sx+, QLUA: tpol_posSzplus
-        auto P = 0.5 * (1 + g4) * (1 - g2 * g3);  
+        PD = PD - g2 * g3 * parD;  
     }
     else
     {
         //polatization projector
         // Notes: P_+,Sx-, QLUA: tpol_posSzplus
-        auto P = 0.5 * (1 + g4) * (1 + g2 * g3);  
+        PD = PD + g2 * g3 * parD;  
     }
 
-    auto PD = P * D; //paritiy projected propagator
-    auto GDG = G * D * G;   //propagator sandwiched between C * gamma5 matrices
+    auto GDG = -1.0 * (G * D * G);   //propagator sandwiched between C * gamma5 matrices
 
     for (int ie_f=0; ie_f < 6 ; ie_f++){
         int a_f = epsilon[ie_f][0]; //a
@@ -50,9 +54,9 @@ vComplexD Proton2ptSite(const mobj &D, const int polarization){
             auto PD_rr_cc = PD()(rho,rho)(c_f,c_i);
             for (int alpha_f=0; alpha_f<Ns; alpha_f++){
             for (int beta_i=0; beta_i<Ns; beta_i++){
-                result()()() += ee  * PD_rr_cc
-                                    * D    ()(alpha_f,beta_i)(a_f,a_i)
-                                    * GDG    ()(alpha_f,beta_i)(b_f,b_i);
+                result += ee  * PD_rr_cc
+                              * D    ()(alpha_f,beta_i)(a_f,a_i)
+                              * GDG    ()(alpha_f,beta_i)(b_f,b_i);
             }}
         }
 
@@ -62,15 +66,14 @@ vComplexD Proton2ptSite(const mobj &D, const int polarization){
         for (int alpha_f=0; alpha_f<Ns; alpha_f++){
             auto D_ar_ac = D()(alpha_f,rho)(a_f,c_i);
             for (int beta_i=0; beta_i<Ns; beta_i++){
-                result()()() -= ee  * D_ar_ac
-                                    * PD    ()(rho,beta_i)(c_f,a_i)
-                                    * GDG        ()(alpha_f,beta_i)(b_f,b_i);
+                result -= ee  * D_ar_ac
+                              * PD    ()(rho,beta_i)(c_f,a_i)
+                              * GDG        ()(alpha_f,beta_i)(b_f,b_i);
             }
         }}
 
     }}
 
-    return result;
 
 }
 
@@ -80,7 +83,6 @@ void ProtonSeqSrcSite(const mobj &F, robj &seq_src, int polarization, int flavor
     // flavor == 1 : up
     // flavor == 2 : down
     // flavor == 0 : up - down
-
     Gamma g1(Gamma::Algebra::GammaX);
     Gamma g2(Gamma::Algebra::GammaY);
     Gamma g3(Gamma::Algebra::GammaZ);
@@ -89,36 +91,49 @@ void ProtonSeqSrcSite(const mobj &F, robj &seq_src, int polarization, int flavor
 
     // projecting onto the quantum numbers of the proton
     // convention as in Gattringer-Lang = i g2 g4 g5
-    auto G = Complex(0,1) * g2 * g4 * g5;
+    auto G = g2 * g4 * g5;
+    auto parF = 0.25*(F + g4*F);
+
+
+    auto PF = parF;
+
+    iSpinMatrix<vComplexD> id = Zero();
+    iSpinMatrix<vComplexD> P;
+    for (int i=0; i<Ns; i++)
+       P()(i,i)()=1;
+ 
+
+    P = 0.25* (id + g4 * id);     
 
     if (polarization==0)
     {
         //polatization projector
         // Notes: P_+,Sz+, QLUA: tpol_posSzplus
-        auto P = 0.5 * (1 + g4) * (1 - g1 * g2);   
+        PF = PF - g1 * g2 * parF;
+        P = P * (id - timesI(g1 * g2 * id));
     }
     else if (polarization==1)
     {
         //polatization projector
         // Notes: P_+,Sx+, QLUA: tpol_posSzplus
-        auto P = 0.5 * (1 + g4) * (1 - g2 * g3);  
+        PF = PF - g2 * g3 * parF;
+        P = P * (id - timesI(g2 * g3 * id));
     }
     else
     {
         //polatization projector
         // Notes: P_+,Sx-, QLUA: tpol_posSzplus
-        auto P = 0.5 * (1 + g4) * (1 + g2 * g3);  
+        PF = PF + g2 * g3 * parF;
+        P = P * (id + timesI(g2 *g3 * id));
     }
     
     
     
 
-    auto PF = P * F; // polarization projected propagator
+    auto GFG = -1.0 * (G * F * G);       //propagator sandwiched between C * gamma5 matrices
 
-    auto GFG = G * F * G;       //propagator sandwiched between C * gamma5 matrices
-
-    auto GF = G * F;
-    auto PFG = PF * G;
+    auto GF = timesI(G * F);
+    auto PFG = timesI(PF * G);
 
     for (int ie_f=0; ie_f < 6 ; ie_f++){
         int a_f = epsilon[ie_f][0]; //a
@@ -140,7 +155,7 @@ void ProtonSeqSrcSite(const mobj &F, robj &seq_src, int polarization, int flavor
                     seq_src()(alpha_f, alpha_i)(a_f,a_i) += ee  *
                                 GFG()(alpha_f, gamma_i)(b_f,b_i) * PF()(alpha_i, gamma_i)(c_f,c_i);
                     seq_src()(alpha_f, alpha_i)(a_f,a_i) += ee  *
-                                GF()(alpha_f, gamma_i)(b_f,c_i) * PFG()(gamma_i, alpha_i)(c_f,b_i)
+                                GF()(alpha_f, gamma_i)(b_f,c_i) * PFG()(gamma_i, alpha_i)(c_f,b_i);
                 }
 
                 if (flavor==1){

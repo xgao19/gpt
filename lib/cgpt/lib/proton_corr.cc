@@ -28,7 +28,7 @@
 
   });
 
-Export(fill_proton_seq_src,{
+  EXPORT(fill_proton_seq_src,{
 
     PyObject* _propagator;
     PyObject* _src;
@@ -53,4 +53,5 @@ Export(fill_proton_seq_src,{
     //isospin singlet, to change, add another integer in function call.
     fill_seq_src<vSpinColourMatrix>(propagator, src, tf);     
 
+    return PyLong_FromLong(0);
 });

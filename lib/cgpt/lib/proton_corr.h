@@ -7,13 +7,13 @@ void fill_seq_src(const PVector<Lattice<T>> &propagator, PVector<Lattice<T>> &se
     //This fills the seq. src for the proton QPDF calculation. Note, the std. argument flavor=0 denotes the isospin singlet.
 
     GridBase *grid = propagator[0].Grid();
-    Nd = grid->_ndimension;
-  
+    const int Nd = grid->_ndimension;
+ 
     // autoView(vseq_src , seq_src , AcceleratorWrite);
     // autoView( vprop          , propagator     , AcceleratorRead);
 
-    VECTOR_VIEW_OPEN(vseq_src , seq_src , AcceleratorWrite);
-    VECTOR_VIEW_OPEN(vprop , propagator , AcceleratorRead);
+    VECTOR_VIEW_OPEN(seq_src , vseq_src , AcceleratorWrite);
+    VECTOR_VIEW_OPEN(propagator , vprop , AcceleratorRead);
 
     for (int polarization=0; polarization<3; polarization++){
 
@@ -25,7 +25,7 @@ void fill_seq_src(const PVector<Lattice<T>> &propagator, PVector<Lattice<T>> &se
         ProtonSeqSrcSite(local_prop, result, polarization, flavor);
         coalescedWrite(vseq_src[2][ss],result);
 
-      }
+      });
 
       Lattice<T> zero(grid); zero=0.0;
       LatticeInteger     coor(grid);
@@ -41,7 +41,7 @@ template<class vobj>
 inline void sliceProton_sum(const PVector<Lattice<vobj>> prop,
                     const PVector<LatticeComplex> &mom,
                     std::vector<iSinglet<ComplexD>> &result,
-                    const int orthodim)
+                    const int orthogdim)
 {
 
   typedef typename vobj::scalar_object sobj;
@@ -55,8 +55,6 @@ inline void sliceProton_sum(const PVector<Lattice<vobj>> prop,
   const int Nbasis = 3; //number of different polarization channels
   const int Nmom = mom.size();
 
-  const int Ngamma = Gmu16.size();
-
   assert(orthogdim >= 0);
   assert(orthogdim < Nd);
 
@@ -65,7 +63,7 @@ inline void sliceProton_sum(const PVector<Lattice<vobj>> prop,
   int rd = grid->_rdimensions[orthogdim];
 
   Vector<vComplexD> lvSum(rd * Nbasis * Nmom);         // will locally sum vectors first
-  Vector<ComplexD> lsSum(ld * Nbasis * Nmom, Zero()); // sum across these down to scalars
+  Vector<ComplexD> lsSum(ld * Nbasis * Nmom, 0.0); // sum across these down to scalars
   result.resize(fd * Nbasis * Nmom);              // And then global sum to return the same vector to every node
   //result.resize(fd * Nbasis);
 
@@ -80,12 +78,13 @@ inline void sliceProton_sum(const PVector<Lattice<vobj>> prop,
   VECTOR_VIEW_OPEN(prop, prop_v, AcceleratorRead);
   VECTOR_VIEW_OPEN(mom, mom_v, AcceleratorRead);
   auto lvSum_p = &lvSum[0];
-//   typedef decltype(coalescedRead(prop_v[0][0])) CalcElem;
-  typedef vComplexD CalcElem;
+  typedef decltype(coalescedRead(mom_v[0][0])) CalcElem;
+//  typedef vComplexD CalcElem;
 
   accelerator_for(r, rd * Nbasis * Nmom, grid->Nsimd(), {
-    CalcElem elem = Zero();
-    CalcElem tmp;
+    //CalcElem elem;
+    //CalcElem tmp;
+    vComplexD elem;
 
     int n_mombase = r / rd;
     int n_mom = n_mombase % Nmom;
@@ -96,7 +95,9 @@ inline void sliceProton_sum(const PVector<Lattice<vobj>> prop,
     for(int n = 0; n < e1; n++){
       for(int b = 0; b < e2; b++){
         int ss = so + n * stride + b;
-        elem += Proton2ptSite(coalescedRead(prop_v[0][ss]), n_base)*coalescedRead(mom_v[n_mom][ss]);
+        vComplexD tmp = 0.0;
+        Proton2ptSite(coalescedRead(prop_v[0][ss]), tmp, n_base);
+        elem += tmp*TensorRemove(coalescedRead(mom_v[n_mom][ss]));
       }
     }
 
@@ -108,7 +109,7 @@ inline void sliceProton_sum(const PVector<Lattice<vobj>> prop,
 
   thread_for(n_base, Nbasis*Nmom, {
     // Sum across simd lanes in the plane, breaking out orthog dir.
-    ExtractBuffer<sobj> extracted(Nsimd); // splitting the SIMD
+    ExtractBuffer<ComplexD> extracted(Nsimd); // splitting the SIMD
     Coordinate icoor(Nd);
 
     for(int rt = 0; rt < rd; rt++){
@@ -157,7 +158,7 @@ PyObject* cgpt_slice_Proton(const PVector<Lattice<T>>& lhs,
 
   int Nbasis = 3; //number of Polarization channels
   int Nmom = mom.size();
-  int Nsobj  = result.size() / lhs.size() / mom.size() / Gmu16.size() ;
+  int Nsobj  = result.size() / Nbasis / mom.size() ;
 
   PyObject* ret = PyList_New(Nbasis);
   for (size_t ii = 0; ii < Nbasis; ii++) {

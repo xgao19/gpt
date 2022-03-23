@@ -48,6 +48,7 @@ from gpt.core.transform import (
     slice_tr,
     slice_trDA,
     slice_trQPDF,
+    slice_proton,
     indexed_sum,
     identity,
     project,
