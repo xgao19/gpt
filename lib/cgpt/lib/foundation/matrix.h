@@ -143,15 +143,3 @@ inline void determinant(Lattice<iSinglet<typename vector_object::vector_type>>& 
 		       return src.determinant();
 		     });
 }
-
-template<typename T>
-inline void projection(Lattice<T>& src){
-  ERR("Not implemented");
-
-}
-
-
-inline void projection(Lattice<iScalar<iScalar<iMatrix<vComplexD,3>>>>& src) {
-  ProjectSU3(src);
-
-}

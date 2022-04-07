@@ -133,6 +133,8 @@ public:
 		      compatible<T>(b)->l,
 		      compatible<T>(c)->l, params);
   }
+  
+
 
   virtual void cshift_from(cgpt_Lattice_base* _src, int dir, int off) {
     cgpt_Lattice<T>* src = compatible<T>(_src);
@@ -268,4 +270,3 @@ public:
   }
 
 };
-

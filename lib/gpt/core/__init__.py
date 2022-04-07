@@ -83,6 +83,7 @@ from gpt.core.basis import (
     orthogonalize,
     orthonormalize,
     linear_combination,
+    bilinear_combination,
     rotate,
     qr_decomposition,
 )
