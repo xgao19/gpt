@@ -9,7 +9,7 @@ import numpy as np
 
 # load configuration
 rng = g.random("test")
-grid = g.grid([8, 8, 8, 4], g.double)
+grid = g.grid([64, 64, 64, 64], g.double)
 U = g.qcd.gauge.random(grid, rng)
 V = rng.element(g.lattice(U[0]))
 U_transformed = g.qcd.gauge.transformed(U, V)
@@ -186,52 +186,29 @@ for i in range(3):
     assert abs(P[i] - P_comp[i]) < 1e-12
 
 # Test gauge fixing
-#opt = g.algorithms.optimize.non_linear_cg(maxiter=50, eps=1e-9, step=0.1)
-#V0 = g.identity(U[0])
-#rng.element(V0)
+opt = g.algorithms.optimize.non_linear_cg(maxiter=50, eps=1e-9, step=0.1)
+V0 = g.identity(U[0])
+rng.element(V0)
 
 # get functionals
-#l = g.qcd.gauge.fix.landau(U)
-#fal = g.algorithms.optimize.fourier_accelerate.inverse_phat_square(V0.grid, l)
+l = g.qcd.gauge.fix.landau(U)
+fal = g.algorithms.optimize.fourier_accelerate.inverse_phat_square(V0.grid, l)
 
 # test functionals
-#l.assert_gradient_error(rng, V0, V0, 1e-3, 1e-8)
+l.assert_gradient_error(rng, V0, V0, 1e-3, 1e-8)
 
 # test gauge fixing
-#for f, f_test, tag, expected_improvement in [
-#    (l, l, "Landau", 1e-7),
-#    (fal, l, "Fourier Accelerated Landau", 1e-9),
-#]:
-#    V1 = g.copy(V0)
+for f, f_test, tag, expected_improvement in [
+    (l, l, "Landau", 1e-7),
+    (fal, l, "Fourier Accelerated Landau", 1e-9),
+]:
+    V1 = g.copy(V0)
 
-#    eps0 = g.norm2(f_test.gradient(V1, V1)) ** 0.5 / f_test(V1)
-#    g.message(f"df/f before {tag} gauge fix: {eps0}")
+    eps0 = g.norm2(f_test.gradient(V1, V1)) ** 0.5 / f_test(V1)
+    g.message(f"df/f before {tag} gauge fix: {eps0}")
 
-#    opt(f)([V1], [V1])
+    opt(f)([V1], [V1])
 
-#    eps1 = g.norm2(f_test.gradient(V1, V1)) ** 0.5 / f_test(V1)
-#    g.message(f"df/f after {tag} gauge fix: {eps1}, improvement: {eps1/eps0}")
-#    assert eps1 / eps0 < expected_improvement
-
-
-
-
-prop = g.mspincolor(grid)
-
-prop_li = [g.copy(prop), g.copy(prop)]
-
-rng.cnormal(prop)
-rng.cnormal(prop_li)
-
-test1 = g.slice(g.trace(prop), 3)
-
-g.message(test1)
-
-test2 = g.slice_tr(prop_li,3)
-
-g.message(test2)
-
-test3 = g.slice_tr1(prop_li, prop, 3)
-
-g.message(test3)
-
+    eps1 = g.norm2(f_test.gradient(V1, V1)) ** 0.5 / f_test(V1)
+    g.message(f"df/f after {tag} gauge fix: {eps1}, improvement: {eps1/eps0}")
+    assert eps1 / eps0 < expected_improvement
