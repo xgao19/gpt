@@ -17,7 +17,7 @@
 #    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 #
 import gpt as g
-
+import cgpt
 
 def diquark(Q1, Q2):
     eps = g.epsilon(Q1.otype.shape[2])
@@ -37,3 +37,14 @@ def diquark(Q1, Q2):
 
     g.merge_color(R, D)
     return R
+
+def proton_seq_src(prop, src, tf):
+    prop = g.util.to_list(g.eval(prop))
+    src  = g.util.to_list(g.eval(src))
+ 
+    cgpt.fill_proton_seq_src(prop,src,tf)
+   
+
+
+   
+  

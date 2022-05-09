@@ -234,6 +234,17 @@ def slice_trQPDF(src, rhs, mom, dim):
 
     return result
 
+def slice_proton(prop, mom, dim):
+    return_list = isinstance(prop, list)
+    prop = gpt.util.to_list(gpt.eval(prop))
+    
+    #check for consistent otype
+    assert all([prop[0].otype == obj.otype for obj in prop])
+    result = cgpt.slice_proton_2pt(prop, mom, dim)
+
+    return result 
+
+
     # if return_list:
     #     #return [[gpt.util.value_to_tensor(v, src[0].otype) for v in res] for res in result]
     #     return [[complex(v) for v in res] for res in result]

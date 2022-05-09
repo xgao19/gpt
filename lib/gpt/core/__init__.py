@@ -48,6 +48,7 @@ from gpt.core.transform import (
     slice_tr,
     slice_trDA,
     slice_trQPDF,
+    slice_proton,
     indexed_sum,
     identity,
     project,
@@ -82,6 +83,7 @@ from gpt.core.basis import (
     orthogonalize,
     orthonormalize,
     linear_combination,
+    bilinear_combination,
     rotate,
     qr_decomposition,
 )
