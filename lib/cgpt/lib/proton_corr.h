@@ -15,16 +15,25 @@ void fill_seq_src(const PVector<Lattice<T>> &propagator, PVector<Lattice<T>> &se
     VECTOR_VIEW_OPEN(seq_src , vseq_src , AcceleratorWrite);
     VECTOR_VIEW_OPEN(propagator , vprop , AcceleratorRead);
 
+    typedef decltype(coalescedRead(vprop[0][0])) CalcElem;
+
+
     for (int polarization=0; polarization<3; polarization++){
+      std::cout << "Starting polarization " << polarization << std::endl;
+      std::cout << "grid->oSites() = " << grid->oSites() << ", grid->Nsimd() = " << grid->Nsimd() << std::endl;
+      std::cout << "size of seq_src = " << seq_src.size() << ", size if propagator = " << propagator.size() << std::endl;
 
       accelerator_for(ss, grid->oSites(), grid->Nsimd(), {
 
-        auto local_prop = vprop[0][ss];
-        auto result = vseq_src[0][ss];
+        auto local_prop = coalescedRead(vprop[0][ss]);
+        //auto result = vseq_src[0][ss];
+        CalcElem result = local_prop;
 
         ProtonSeqSrcSite(local_prop, result, polarization, flavor);
-        //coalescedWrite(vseq_src[2][ss],result);
-        vseq_src[2][ss] = result;
+        //Proton2ptSite(local_prop, result, polarization);
+	//Proton2ptSite(coalescedRead(local_prop), result, polarization);
+	coalescedWrite(vseq_src[2][ss],result);
+        //vseq_src[2][ss] = result;
 
       });
 
@@ -33,8 +42,10 @@ void fill_seq_src(const PVector<Lattice<T>> &propagator, PVector<Lattice<T>> &se
       LatticeCoordinate(coor, Nd-1);
 
       seq_src[polarization] = where(coor==Integer(tf),seq_src[2],zero);
-
+      std::cout << "I am at polarization " << polarization << std::endl;
     }
+    VECTOR_VIEW_CLOSE(vseq_src);
+    VECTOR_VIEW_CLOSE(vprop);
 
 }
 
@@ -128,11 +139,11 @@ inline void sliceProton_sum(const PVector<Lattice<vobj>> prop,
       int lt = t % ld;
       if ( pt == grid->_processor_coor[orthogdim] ) {
         
-        result[n_base * fd  + t] = lsSum[n_base * ld + t];
+        result[n_base * fd  + lt] = lsSum[n_base * ld + lt];
         //result[n_base * fd + t] = TensorRemove(trace(lsSum[n_base * ld + lt]));
 
       } else {
-        result[n_base * fd  + t] = scalar_type(0.0); //Zero();
+        result[n_base * fd  + lt] = scalar_type(0.0); //Zero();
         //result[n_base * fd +t] = scalar_type(0.0);
       }
     }

@@ -21,19 +21,19 @@ __host__ __device__ void Proton2ptSite(const mobj &D, robj &result, const int po
     {
         //polatization projector
         // Notes: P_+,Sz+, QLUA: tpol_posSzplus
-        PD = PD - g1 * (g2 * parD);   
+        PD = PD - timesI(g1 * (g2 * parD));   
     }
     else if (polarization==1)
     {
         //polatization projector
         // Notes: P_+,Sx+, QLUA: tpol_posSzplus
-        PD = PD - g2 * (g3 * parD);  
+        PD = PD - timesI(g2 * (g3 * parD));  
     }
     else
     {
         //polatization projector
         // Notes: P_+,Sx-, QLUA: tpol_posSzplus
-        PD = PD + g2 * (g3 * parD);  
+        PD = PD + timesI(g2 * (g3 * parD));  
     }
 
     //auto GDG = -1.0 * (G * D * G);   //propagator sandwiched between C * gamma5 matrices
@@ -105,8 +105,10 @@ __host__ __device__ void ProtonSeqSrcSite(const mobj &F, robj &seq_src, int pola
 
     iSpinMatrix<vComplexD> id = Zero();
     iSpinMatrix<vComplexD> P;
+
+
     for (int i=0; i<Ns; i++)
-       P()(i,i)()=1;
+       id()(i,i)()=1;
  
 
     P = 0.25* (id + g4 * id);     
@@ -115,21 +117,21 @@ __host__ __device__ void ProtonSeqSrcSite(const mobj &F, robj &seq_src, int pola
     {
         //polatization projector
         // Notes: P_+,Sz+, QLUA: tpol_posSzplus
-        PF = PF - g1 * (g2 * parF);
+        PF = PF - timesI(g1 * (g2 * parF));
         P = P * (id - timesI(g1 * (g2 * id)));
     }
     else if (polarization==1)
     {
         //polatization projector
         // Notes: P_+,Sx+, QLUA: tpol_posSzplus
-        PF = PF - g2 * (g3 * parF);
+        PF = PF - timesI(g2 * (g3 * parF));
         P = P * (id - timesI(g2 * (g3 * id)));
     }
     else
     {
         //polatization projector
         // Notes: P_+,Sx-, QLUA: tpol_posSzplus
-        PF = PF + g2 * (g3 * parF);
+        PF = PF + timesI(g2 * (g3 * parF));
         P = P * (id + timesI(g2 * (g3 * id)));
     }
     
@@ -141,6 +143,7 @@ __host__ __device__ void ProtonSeqSrcSite(const mobj &F, robj &seq_src, int pola
 
     auto GF = timesI(g2 * ( g4 * (g5 * F)));
     auto PFG = timesI(((PF * g2 ) * g4 ) *g5 );
+    auto FP = F*P;
 
     for (int ie_f=0; ie_f < 6 ; ie_f++){
         int a_f = epsilon[ie_f][0]; //a
@@ -192,8 +195,9 @@ __host__ __device__ void ProtonSeqSrcSite(const mobj &F, robj &seq_src, int pola
 
                 if (flavor!=2)
                 seq_src()(alpha_f, alpha_i)(a_f,a_i) += ee  * 
-                    (GFG()(gamma_f,alpha_i)(b_f,b_i) * F()(gamma_f, gamma_i)(c_f,c_i) * P()(gamma_i,alpha_f)()
-                    +GFG()(gamma_f,gamma_i)(b_f,b_i) * F()(gamma_f, gamma_i)(c_f,c_i) * P()(alpha_f, alpha_i)());
+                    GFG()(gamma_f,alpha_i)(b_f,b_i); //* P()(gamma_i,alpha_f)();
+         //       seq_src()(alpha_f, alpha_i)(a_f,a_i) += ee  *    
+	//	     +GFG()(gamma_f,gamma_i)(b_f,b_i) * F()(gamma_f, gamma_i)(c_f,c_i);// * P()(alpha_f, alpha_i)();
             }}
 
 
