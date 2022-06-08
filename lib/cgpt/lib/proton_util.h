@@ -97,14 +97,15 @@ __host__ __device__ void ProtonSeqSrcSite(const mobj &F, robj &seq_src, int pola
 
     // projecting onto the quantum numbers of the proton
     // convention as in Gattringer-Lang = i g2 g4 g5
-    //auto G = g2 * g4 * g5;
+    // G = i * g2 * g4 * g5;
     auto parF = 0.25*(F + g4*F);
 
 
     auto PF = parF;
+    auto FP = 0.25*(F+F*g4);
 
-    iSpinMatrix<vComplexD> id = Zero();
-    iSpinMatrix<vComplexD> P;
+    iSpinMatrix<ComplexD> id = Zero();
+    iSpinMatrix<ComplexD> P;
 
 
     for (int i=0; i<Ns; i++)
@@ -118,6 +119,7 @@ __host__ __device__ void ProtonSeqSrcSite(const mobj &F, robj &seq_src, int pola
         //polatization projector
         // Notes: P_+,Sz+, QLUA: tpol_posSzplus
         PF = PF - timesI(g1 * (g2 * parF));
+	FP = FP - timesI((FP * g1) * g2);
         P = P * (id - timesI(g1 * (g2 * id)));
     }
     else if (polarization==1)
@@ -125,25 +127,26 @@ __host__ __device__ void ProtonSeqSrcSite(const mobj &F, robj &seq_src, int pola
         //polatization projector
         // Notes: P_+,Sx+, QLUA: tpol_posSzplus
         PF = PF - timesI(g2 * (g3 * parF));
-        P = P * (id - timesI(g2 * (g3 * id)));
+        FP = FP - timesI((FP* g2) *g3);
+	P = P * (id - timesI(g2 * (g3 * id)));
     }
     else
     {
         //polatization projector
         // Notes: P_+,Sx-, QLUA: tpol_posSzplus
         PF = PF + timesI(g2 * (g3 * parF));
+	FP = FP + timesI((FP * g2) *g3);
         P = P * (id + timesI(g2 * (g3 * id)));
     }
     
     
     
 
-    //auto GFG = -1.0 * (G * F * G);       //propagator sandwiched between C * gamma5 matrices
+    //auto GFG = (G * F * G);       //propagator sandwiched between C * gamma5 matrices
     auto GFG = -1.0 * (g2 * ( g4 * (g5 * F * g2) * g4) *g5); 
 
     auto GF = timesI(g2 * ( g4 * (g5 * F)));
     auto PFG = timesI(((PF * g2 ) * g4 ) *g5 );
-    auto FP = F*P;
 
     for (int ie_f=0; ie_f < 6 ; ie_f++){
         int a_f = epsilon[ie_f][0]; //a
@@ -166,6 +169,8 @@ __host__ __device__ void ProtonSeqSrcSite(const mobj &F, robj &seq_src, int pola
                                 GFG()(alpha_f, gamma_i)(b_f,b_i) * PF()(alpha_i, gamma_i)(c_f,c_i);
                     seq_src()(alpha_f, alpha_i)(a_f,a_i) += ee  *
                                 GF()(alpha_f, gamma_i)(b_f,c_i) * PFG()(gamma_i, alpha_i)(c_f,b_i);
+                    seq_src()(alpha_f, alpha_i)(a_f,a_i) += ee  *
+                                GFG()(gamma_i,alpha_i)(b_f,b_i) * FP()(gamma_i,alpha_f)(c_f,c_i);
                 }
 
                 if (flavor==1){
@@ -173,6 +178,8 @@ __host__ __device__ void ProtonSeqSrcSite(const mobj &F, robj &seq_src, int pola
                                 GFG()(alpha_f, gamma_i)(b_f,b_i) * PF()(alpha_i, gamma_i)(c_f,c_i);
                     seq_src()(alpha_f, alpha_i)(a_f,a_i) += ee  * 
                                 GFG()(alpha_f,alpha_i)(b_f,b_i) * PF()(gamma_i, gamma_i)(c_f,c_i);
+		    seq_src()(alpha_f, alpha_i)(a_f,a_i) += ee  *
+                                GFG()(gamma_i,alpha_i)(b_f,b_i) * FP()(gamma_i,alpha_f)(c_f,c_i);
                 }
 
                 if (flavor==2){
@@ -187,21 +194,19 @@ __host__ __device__ void ProtonSeqSrcSite(const mobj &F, robj &seq_src, int pola
 
         }}
 
+	if(flavor!=2){ 
         for (int alpha_f=0; alpha_f<Ns; alpha_f++){
         for (int alpha_i=0; alpha_i<Ns; alpha_i++){
 
             for (int gamma_f=0; gamma_f<Ns; gamma_f++){
             for (int gamma_i=0; gamma_i<Ns; gamma_i++){
 
-                if (flavor!=2)
                 seq_src()(alpha_f, alpha_i)(a_f,a_i) += ee  * 
-                    GFG()(gamma_f,alpha_i)(b_f,b_i); //* P()(gamma_i,alpha_f)();
-         //       seq_src()(alpha_f, alpha_i)(a_f,a_i) += ee  *    
-	//	     +GFG()(gamma_f,gamma_i)(b_f,b_i) * F()(gamma_f, gamma_i)(c_f,c_i);// * P()(alpha_f, alpha_i)();
+                    GFG()(gamma_f,gamma_i)(b_f,b_i) * F()(gamma_f,gamma_i)(c_f,c_i) * P()(alpha_f, alpha_i)();
             }}
 
 
-        }}
+        }}}
 
     }}
 
