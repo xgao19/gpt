@@ -130,12 +130,12 @@ def rectangle(
         elements = []
         for configuration in configurations:
             c_paths = [
-                g.qcd.gauge.path().f(mu, L_mu).f(nu, L_nu).b(mu, L_mu).b(nu, L_nu)
+                g.path().f(mu, L_mu).f(nu, L_nu).b(mu, L_mu).b(nu, L_nu)
                 for mu, L_mu, nu, L_nu in configuration
             ]
             elements.append(len(c_paths))
             paths = paths + c_paths
-        cache[cache_key] = (g.qcd.gauge.transport(U, paths), elements)
+        cache[cache_key] = (g.parallel_transport(U, paths), elements)
 
     transport = cache[cache_key][0]
     ranges = cache[cache_key][1]
@@ -159,22 +159,6 @@ def rectangle(
     return results
 
 
-def plaquette(U):
-    # U[mu](x)*U[nu](x+mu)*adj(U[mu](x+nu))*adj(U[nu](x))
-    tr = 0.0
-    vol = float(U[0].grid.fsites)
-    Nd = len(U)
-    ndim = U[0].otype.shape[0]
-    for mu in range(Nd):
-        for nu in range(mu):
-            tr += g.sum(
-                g.trace(
-                    U[mu] * g.cshift(U[nu], mu, 1) * g.adj(g.cshift(U[mu], nu, 1)) * g.adj(U[nu])
-                )
-            )
-    return 2.0 * tr.real / vol / Nd / (Nd - 1) / ndim
-
-
 def field_strength(U, mu, nu):
     assert mu != nu
     # v = staple_up - staple_down
@@ -186,14 +170,3 @@ def field_strength(U, mu, nu):
     F = g.eval(U[mu] * v + g.cshift(v * U[mu], mu, -1))
     F @= 0.125 * (F - g.adj(F))
     return F
-
-
-def energy_density(U, field=False):
-    Nd = len(U)
-    accumulator = accumulators[(field, True)]
-    res = accumulator(U[0])
-    for mu in range(Nd):
-        for nu in range(mu):
-            Fmunu = field_strength(U, mu, nu)
-            res += Fmunu * Fmunu
-    return res.scaled_project(-1.0, True)

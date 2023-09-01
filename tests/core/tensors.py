@@ -147,6 +147,31 @@ for i in range(n):
         eps = np.linalg.norm(cm[0, 0, 0, 0, i, j] - cl[0, 0, 0, 0, i] * cr[0, 0, 0, 0, j].conj())
         assert eps < 1e-13
 
+
+# outer product of vcomplex
+n = 12
+cm = g.mcomplex(grid, n)
+cl = rng.normal(g.vcomplex(grid, n))
+cr = rng.normal(g.vcomplex(grid, n))
+cm @= cl * g.adj(cr)
+for i in range(n):
+    for j in range(n):
+        eps = np.linalg.norm(cm[0, 0, 0, 0, i, j] - cl[0, 0, 0, 0, i] * cr[0, 0, 0, 0, j].conj())
+        assert eps < 1e-13
+
+# test g.sum
+s1 = g.sum(cm).array
+s2 = np.sum(cm[:, :, :, :], axis=0)
+cm.grid.globalsum(s2)
+eps = np.linalg.norm(s2 - s1) ** 2.0 / grid.gsites / (n * n)
+assert eps < 1e-10
+
+s1 = g.sum(cv).array
+s2 = np.sum(cv[:, :, :, :], axis=0)
+cm.grid.globalsum(s2)
+eps = np.linalg.norm(s2 - s1) ** 2.0 / grid.gsites / (n)
+assert eps < 1e-10
+
 # once inner product is implemented, test:
 # cs = g.real(grid)
 # cs @= g.adj(cl) * cr

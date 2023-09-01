@@ -98,10 +98,10 @@ class differentiable_functional:
             g.message(f"Error: gradient = {a} <> approximate_gradient = {b}")
             assert False
         # the gradient needs to live in cartesian
-        for gr in gradient:
-            if gr.otype.__name__ != weights[0].otype.__name__:
+        for gr, ww in zip(gradient, weights):
+            if gr.otype.__name__ != ww.otype.__name__:
                 g.message(
-                    f"Gradient has incorrect object type: {gr.otype.__name__} != {weights[0].otype.__name__}"
+                    f"Gradient has incorrect object type: {gr.otype.__name__} != {ww.otype.__name__}"
                 )
             eps = g.group.defect(gr)
             if eps > epsilon_assert:
@@ -121,7 +121,6 @@ class transformed(differentiable_functional):
         return self.f(self.t(fields))
 
     def gradient(self, fields, dfields):
-
         indices = [fields.index(d) for d in dfields]
 
         fields_prime = self.t(fields)

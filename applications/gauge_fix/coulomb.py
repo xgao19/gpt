@@ -3,28 +3,35 @@
 # Author: Christoph Lehner 2021
 #
 import gpt as g
+import numpy as np
 import sys
 
 # Parameters
 p_mpi_split = g.default.get_ivec("--mpi_split", None, 3)
 p_maxiter_cg = g.default.get_int("--maxiter_cg", 500)
-p_maxiter_gd = g.default.get_int("--maxiter_gd", 100000)
+p_maxiter_gd = g.default.get_int("--maxiter_gd", 2500)
 p_eps = g.default.get_float("--eps", 3e-8)
 p_step = g.default.get_float("--step", 0.03)
+p_gd_step = g.default.get_float("--gd_step", 0.05)
 p_source = g.default.get("--source", None)
 p_rng_seed = g.default.get("--random", None)
+p_theta_eps = g.default.get_float("--theta_eps", 1e-14)
+p_max_abs_step = g.default.get_float("--max_abs_step", 0.3)
 
 g.message(
     f"""
 
   Coulomb gauge fixer run with:
 
-    maxiter_cg  = {p_maxiter_cg}
-    maxiter_gd  = {p_maxiter_gd}
-    eps         = {p_eps}
-    step        = {p_step}
-    source      = {p_source}
-    random      = {p_rng_seed}
+    maxiter_cg    = {p_maxiter_cg}
+    maxiter_gd    = {p_maxiter_gd}
+    eps           = {p_eps}
+    step          = {p_step}
+    gd_step       = {p_gd_step}
+    max_abs_step  = {p_max_abs_step}
+    theta_eps     = {p_theta_eps}
+    source        = {p_source}
+    random        = {p_rng_seed}
 
   Note: convergence is only guaranteed for sufficiently small step parameter.
 
@@ -65,8 +72,9 @@ cg = opt.non_linear_cg(
     step=p_step,
     line_search=opt.line_search_quadratic,
     beta=opt.polak_ribiere,
+    max_abs_step=p_max_abs_step,
 )
-gd = opt.gradient_descent(maxiter=p_maxiter_gd, eps=p_eps, step=p_step)
+gd = opt.gradient_descent(maxiter=p_maxiter_gd, eps=p_eps, step=p_gd_step)
 
 # Coulomb functional on each time-slice
 Nt_split = len(Vt_split)
@@ -89,9 +97,10 @@ for t in range(Nt_split):
     group_defect = g.group.defect(Vt_split[t])
     g.message(f"Distance to group manifold: {group_defect}")
     if group_defect > 1e-12:
-        raise Exception(
+        g.message(
             f"Time slice {t} on split grid {Vt_split[t].grid.srank} has group_defect = {group_defect}"
         )
+        sys.exit(1)
 
 g.message("Unsplit")
 
@@ -110,6 +119,9 @@ for t in range(Nt):
     theta = g.norm2(dfv).real / Vt[t].grid.gsites / dfv.otype.Nc
     g.message(f"theta[{t}] = {theta}")
     g.message(f"V[{t}][0,0,0] = ", Vt[t][0, 0, 0])
+    if theta > p_theta_eps or np.isnan(theta):
+        g.message(f"Time slice{t} did not converge: {theta} >= {p_theta_eps}")
+        sys.exit(1)
 
 # merge time slices
 V = g.merge(Vt, 3)
@@ -119,5 +131,5 @@ U_transformed = g.qcd.gauge.transformed(U, V)
 U_transformed = [g.project(u, "defect") for u in U_transformed]
 
 # save results
-g.save("U.transformed", U_transformed, g.format.nersc())
-g.save("V", V)
+g.save(f"{p_source}.Coulomb", U_transformed, g.format.nersc())
+g.save(f"{p_source}.CoulombV", V)

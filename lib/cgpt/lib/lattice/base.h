@@ -23,8 +23,9 @@ public:
   virtual ~cgpt_Lattice_base() { };
   virtual cgpt_Lattice_base* create_lattice_of_same_type() = 0;
   virtual void set_to_number(ComplexD val) = 0;
+  virtual void set_to_identity() = 0;
   virtual PyObject* to_str() = 0;
-  virtual PyObject* sum() = 0;
+  virtual PyObject* rank_sum() = 0;
   virtual RealD norm2() = 0;
   virtual void axpy(ComplexD a, cgpt_Lattice_base* x, cgpt_Lattice_base* y) = 0;
   virtual void rank_inner_product(ComplexD* result, std::vector<cgpt_Lattice_base*> & left, std::vector<cgpt_Lattice_base*> & right, long n_virtual, bool use_accelerator) = 0;
@@ -43,8 +44,8 @@ public:
   virtual int singlet_rank() = 0;
   virtual PyObject* to_decl() = 0;
   virtual void convert_from(cgpt_Lattice_base* src) = 0;
-  virtual PyObject* slice(std::vector<cgpt_Lattice_base*> _basis, int dim) = 0;
-  virtual PyObject* indexed_sum(std::vector<cgpt_Lattice_base*> _basis, cgpt_Lattice_base* idx, long len) = 0;
+  virtual PyObject* rank_slice(std::vector<cgpt_Lattice_base*> _basis, int dim) = 0;
+  virtual PyObject* rank_indexed_sum(std::vector<cgpt_Lattice_base*> _basis, cgpt_Lattice_base* idx, long len) = 0;
   virtual void ferm_to_prop(cgpt_Lattice_base* prop, int spin, int color, bool f2p) = 0;
   virtual void pick_checkerboard_from(int cb, cgpt_Lattice_base* src) = 0;
   virtual void set_checkerboard_from(cgpt_Lattice_base* src) = 0;
@@ -63,6 +64,8 @@ public:
   virtual void invert_matrix(std::vector<cgpt_Lattice_base*>& matrix_inv, std::vector<cgpt_Lattice_base*>& matrix, long n_virtual) = 0;
   virtual void determinant(cgpt_Lattice_base* det, std::vector<cgpt_Lattice_base*>& matrix, long n_virtual) = 0; // this determines type of matrix[0]
   virtual GridBase* get_grid() = 0;
+  virtual cgpt_stencil_matrix_base* stencil_matrix(GridBase* grid, PyObject* shifts, PyObject* code) = 0;
+
 };
 
 template<class T> class cgpt_Lattice;

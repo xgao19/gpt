@@ -8,12 +8,15 @@ import gpt as g
 import sys, os
 import numpy
 
-beta = g.default.get_float("--beta", 5.96)
-
+beta = g.default.get_float("--beta", 6.0)
+seed = g.default.get("--seed", "hmc-pure-gauge")
+ntherm = g.default.get_int("--ntherm", 400)
+n = g.default.get_int("--n", 100)
+nwrite = g.default.get_int("--nwrite", 10)
 g.default.set_verbose("omf4")
 
 grid = g.grid([8, 8, 8, 16], g.double)
-rng = g.random("hmc-pure-gauge")
+rng = g.random(seed)
 
 U = g.qcd.gauge.unit(grid)
 rng.normal_element(U)
@@ -65,7 +68,6 @@ def hmc(tau, mom):
 
 
 # thermalization
-ntherm = 100
 for i in range(1, 11):
     h = []
     timer = g.timer("hmc")
@@ -75,25 +77,20 @@ for i in range(1, 11):
     h = numpy.array(h)
     timer()
     g.message(f"{i*10} % of thermalization completed")
-    g.message(f'Average time per trajectory = {timer.dt["trajectory"]/ntherm*10:g} secs')
+    g.message(timer)
     g.message(
         f"Plaquette = {g.qcd.gauge.plaquette(U)}, Acceptance = {numpy.mean(h[:,0]):.2f}, |dH| = {numpy.mean(numpy.abs(h[:,1])):.4e}"
     )
 
 # production
 history = []
-data = []
-n = 100
-dtrj = 10
 for i in range(n):
-    for k in range(dtrj):
-        history += [hmc(tau, mom)]
-    data += [g.qcd.gauge.plaquette(U)]
-    g.message(f"Trajectory {i}, {history[-1]}")
+    history += [hmc(tau, mom)]
+    P = g.qcd.gauge.plaquette(U)
+    g.message(f"Trajectory {i}, P={P}")
+    if i % nwrite == 0:
+        g.save(f"ckpoint_lat.{seed}.{i}", U, g.format.nersc())
 
 history = numpy.array(history)
 g.message(f"Acceptance rate = {numpy.mean(history[:,0]):.2f}")
 g.message(f"<|dH|> = {numpy.mean(numpy.abs(history[:,1])):.4e}")
-
-data = numpy.array(data)
-g.message(f"<plaq>   = {numpy.mean(data[:,0])}")

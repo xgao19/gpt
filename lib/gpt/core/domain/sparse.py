@@ -28,24 +28,34 @@ def get_cache(c, l):
 
 
 class sparse_kernel:
-    def __init__(self, grid, local_coordinates):
+    def __init__(self, grid, unmasked_local_coordinates, dimensions_divisible_by, mask):
         assert grid.cb.n == 1
         self.grid = grid
-        self.local_coordinates = local_coordinates
+
+        if mask is None:
+            mask = [True] * len(unmasked_local_coordinates)
+
+        self.local_coordinates = unmasked_local_coordinates[mask]
+
+        if dimensions_divisible_by is None:
+            dimensions_divisible_by = [16] + [1] * (self.grid.nd - 1)
 
         # create a minimally embedding lattice geometry
-        n = len(local_coordinates)
+        n = len(unmasked_local_coordinates)
         N = self.grid.Nprocessors
         l = np.zeros(N, dtype=np.uint64)
-        l[self.grid.processor] = 2 ** int(np.ceil(np.log(n) / np.log(2)))
+        l[self.grid.processor] = n
         l = grid.globalsum(l)
-        self.L = [int(np.max(l)) * self.grid.mpi[0]] + self.grid.mpi[1:]
+        f_sites = int(np.max(l) * np.prod(self.grid.mpi))
+        f_dimensions = np.lcm(self.grid.mpi, dimensions_divisible_by).tolist()
+        n_block = int(np.prod(f_dimensions))
+        f_dimensions[0] *= (f_sites + n_block - 1) // n_block
 
         cb_simd_only_first_dimension = gpt.general(1, [0] * grid.nd, [1] + [0] * (grid.nd - 1))
 
         # create grid as subcommunicator so that sparse domains play nice with split grid
         self.embedding_grid = gpt.grid(
-            self.L,
+            f_dimensions,
             grid.precision,
             cb_simd_only_first_dimension,
             None,
@@ -53,15 +63,17 @@ class sparse_kernel:
             grid,
         )
 
-        self.embedded_coordinates = np.ascontiguousarray(gpt.coordinates(self.embedding_grid)[0:n])
+        self.embedded_coordinates = np.ascontiguousarray(
+            gpt.coordinates(self.embedding_grid)[0 : len(mask)][mask]
+        )
 
         self.embedded_cache = {}
         self.local_cache = {}
-        self.coordinate_lattices_cache = None
+        self.coordinate_lattices_cache = {}
         self.weight_cache = None
         self.one_mask_cache = None
 
-    def one_mask(self):
+    def cached_one_mask(self):
         if self.one_mask_cache is not None:
             return self.one_mask_cache
 
@@ -82,8 +94,8 @@ class sparse_kernel:
             ):
                 lhalf, l, o = int(_l // 2), int(_l), int(_o)
                 x = gpt(
-                    gpt.component.mod(l)(_x + self.one_mask() * (l + lhalf - o))
-                    - lhalf * self.one_mask()
+                    gpt.component.mod(l)(_x + self.cached_one_mask() * (l + lhalf - o))
+                    - lhalf * self.cached_one_mask()
                 )
                 r = r + x * p * 1j
         return gpt.component.exp(r)
@@ -112,29 +124,29 @@ class sparse_kernel:
         x[:] = 0
         return x
 
-    def coordinate_lattices(self):
-        if self.coordinate_lattices_cache is not None:
-            return self.coordinate_lattices_cache
+    def coordinate_lattices(self, mark_empty=0):
+        if mark_empty in self.coordinate_lattices_cache:
+            return self.coordinate_lattices_cache[mark_empty]
 
         ret = []
         for i in range(self.grid.nd):
             coor_i = self.lattice(gpt.ot_real_additive_group())
+            coor_i[:] = mark_empty
             coor_i[self.embedded_coordinates] = self.local_coordinates[:, i].astype(
                 self.grid.precision.complex_dtype
             )
             ret.append(coor_i)
 
-        self.coordinate_lattices_cache = ret
+        self.coordinate_lattices_cache[mark_empty] = ret
         return ret
 
 
 class sparse:
-    def __init__(self, grid, local_coordinates):
-        self.local_coordinates = local_coordinates
+    def __init__(self, grid, unmasked_local_coordinates, dimensions_divisible_by=None, mask=None):
         self.grid = grid
 
         # kernel to avoid circular references through captures below
-        kernel = sparse_kernel(grid, local_coordinates)
+        kernel = sparse_kernel(grid, unmasked_local_coordinates, dimensions_divisible_by, mask)
 
         def _project(dst, src):
             for d, s in zip(dst, src):
@@ -169,12 +181,26 @@ class sparse:
         )
 
         self.kernel = kernel
+        self.local_coordinates = kernel.local_coordinates
 
     def weight(self):
         return self.kernel.weight()
 
-    def coordinate_lattices(self):
-        return self.kernel.coordinate_lattices()
+    def embedded_coordinates(self, coordinates):
+        idx1 = self.grid.lexicographic_index(coordinates)
+        idx2 = self.grid.lexicographic_index(self.kernel.local_coordinates)
+        idx_common = np.nonzero(np.in1d(idx2, idx1))[0]
+        return self.kernel.embedded_coordinates[idx_common, :]
+
+    def one_mask(self, coordinates):
+        emb_coor = self.embedded_coordinates(coordinates)
+        one = self.lattice(gpt.ot_singlet())
+        one[:] = 0
+        one[emb_coor] = 1
+        return one
+
+    def coordinate_lattices(self, **args):
+        return self.kernel.coordinate_lattices(**args)
 
     def lattice(self, otype):
         return self.kernel.lattice(otype)

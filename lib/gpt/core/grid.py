@@ -62,11 +62,16 @@ def str_to_checkerboarding(s, nd):
 
 def grid_from_description(description):
     p = description.split(";")
-    fdimensions = [int(x) for x in p[0].strip("[]").split(",")]
-    precision = gpt.str_to_precision(p[1])
-    cb = str_to_checkerboarding(p[2], len(fdimensions))
-    obj = None
-    return grid(fdimensions, precision, cb, obj)
+    assert len(p) % 3 == 0
+    parent = None
+    for i in reversed(range(len(p) // 3)):
+        fdimensions = [int(x) for x in p[3 * i + 0].strip("[]").split(",")]
+        precision = gpt.str_to_precision(p[3 * i + 1])
+        cb = str_to_checkerboarding(p[3 * i + 2], len(fdimensions))
+        obj = None
+        mpi = None if parent is None else parent.mpi
+        parent = grid(fdimensions, precision, cb, obj, parent=parent, mpi=mpi)
+    return parent
 
 
 def grid_get_mpi_default(fdimensions, cb):
@@ -88,6 +93,14 @@ def grid_get_mpi_default(fdimensions, cb):
 
     assert nd == len(mpi)
     return mpi
+
+
+def global_sum_default(grid, x):
+    if type(x) == gpt.tensor:
+        cgpt.grid_globalsum(grid.obj, x.array)
+        return x
+    else:
+        return cgpt.grid_globalsum(grid.obj, x)
 
 
 class grid:
@@ -120,7 +133,7 @@ class grid:
 
         if obj is None:
             self.obj = cgpt.create_grid(
-                fdimensions, precision, cb.cb_mask, cb.simd_mask, self.mpi, parent_obj
+                fdimensions, precision.cgpt_dtype, cb.cb_mask, cb.simd_mask, self.mpi, parent_obj
             )
         else:
             self.obj = obj
@@ -249,8 +262,34 @@ class grid:
         cgpt.grid_barrier(self.obj)
 
     def globalsum(self, x):
-        if type(x) == gpt.tensor:
-            cgpt.grid_globalsum(self.obj, x.array)
-            return x
-        else:
-            return cgpt.grid_globalsum(self.obj, x)
+        return self.precision.global_sum_policy(self, x)
+
+    def broadcast(self, root, array):
+        cgpt.grid_broadcast(self.obj, root, array)
+
+    def exchange(self, send_to, recv_from, send_array, recv_array):
+        cgpt.grid_exchange(self.obj, send_to, recv_from, send_array, recv_array)
+
+    def lexicographic_index(self, coordinates):
+        # order of coordinates x,y,z,t
+        # s = x + Lx*y + Lx*Ly*z + Lx*Ly*Lz*t
+        l = [1] + list(np.cumprod(self.fdimensions[:-1]))
+        n, d = coordinates.shape
+        assert d == self.nd
+        return coordinates @ np.array(l)
+
+    def reduce(self, array, functor):
+        me = np.copy(array)
+        other = np.copy(array)
+
+        planes = int(np.ceil(np.log2(self.Nprocessors)))
+
+        for i in range(planes):
+            j = self.processor ^ (2**i)
+            if j < self.Nprocessors:
+                self.exchange(j, j, me, other)
+                functor(me, other)
+
+        self.broadcast(0, me)
+
+        return me

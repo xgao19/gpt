@@ -124,6 +124,9 @@ class gpt_io:
             if write and dn is not None:
                 os.makedirs(dn, exist_ok=True)
             self.loc[tag] = gpt.FILE(fn, "a+b" if write else "rb") if fn is not None else None
+            if write and fn is not None:
+                # seek immediately to have proper .tell result
+                self.loc[tag].seek(0, 2)
 
         if tag_pos not in self.pos:
             self.pos[tag_pos] = gpt.coordinates(cv)
@@ -195,7 +198,7 @@ class gpt_io:
                 f.write(mv)
                 f.flush()
                 dt_write += gpt.time()
-                szGB += len(mv) / 1024.0 ** 3.0
+                szGB += len(mv) / 1024.0**3.0
 
         t1 = gpt.time()
 
@@ -266,7 +269,7 @@ class gpt_io:
                 dt_crc += gpt.time()
                 assert crc_comp == crc_exp
                 sys.stdout.flush()
-                szGB += len(data) / 1024.0 ** 3.0
+                szGB += len(data) / 1024.0**3.0
             else:
                 assert len(pos) == 0
                 data = None
@@ -327,13 +330,16 @@ class gpt_io:
         return sdomain.grid.describe()
 
     def read_domain_sparse(self, sdomain_grid, sdomain_cl):
-        def rmnan(x):
-            return x[~numpy.isnan(x)[:, 0]]
+        mask = (sdomain_cl[0][:] >= 0)[:, 0]
 
-        local_coordinates = numpy.hstack(
-            tuple([rmnan(x[:]).real.astype(numpy.int32) for x in sdomain_cl])
+        local_coordinates = numpy.hstack(tuple([x[:].real.astype(numpy.int32) for x in sdomain_cl]))
+
+        return gpt.domain.sparse(
+            sdomain_grid,
+            local_coordinates,
+            dimensions_divisible_by=sdomain_cl[0].grid.fdimensions,
+            mask=mask,
         )
-        return gpt.domain.sparse(sdomain_grid, local_coordinates)
 
     def write(self, objs):
         self.create_index("", objs)
@@ -377,7 +383,7 @@ class gpt_io:
         elif type(objs) == gpt.domain.sparse:
             f.write("domain.sparse <\n")
             f.write(self.write_domain_sparse(ctx, objs) + "\n")
-            for i, x in enumerate(objs.coordinate_lattices()):
+            for i, x in enumerate(objs.coordinate_lattices(mark_empty=-1)):
                 f.write("lattice %s\n" % self.write_lattice(ctx + "/cl" + str(i), x))
             f.write(">\n")
         else:

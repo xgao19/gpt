@@ -165,6 +165,7 @@ def inner_product_norm2(a, b):
 def axpy(d, a, x, y):
     x = gpt.eval(x)
     y = gpt.eval(y)
+    a = complex(a)
     assert len(y.otype.v_idx) == len(x.otype.v_idx)
     assert len(d.otype.v_idx) == len(x.otype.v_idx)
     for i in x.otype.v_idx:
@@ -251,17 +252,28 @@ def slice_proton(prop, mom, dim):
     # return [complex(v) for v in result[0]]
     # #return [gpt.util.value_to_tensor(v, src[0].otype) for v in result[0]]
 def slice(src, dim):
-    return fields_to_tensors(src, lambda s: cgpt.lattice_slice(s, dim))
+    return fields_to_tensors(src, lambda s: s[0].grid.globalsum(cgpt.lattice_rank_slice(s, dim)))
 
 
 def indexed_sum(fields, index, length):
     index_obj = index.v_obj[0]
-    return fields_to_tensors(fields, lambda src: cgpt.lattice_indexed_sum(src, index_obj, length))
+    return fields_to_tensors(
+        fields, lambda s: s[0].grid.globalsum(cgpt.lattice_rank_indexed_sum(s, index_obj, length))
+    )
 
 
 def identity(src):
     eye = gpt.lattice(src)
-    eye[:] = src.otype.identity()
+    # identity only works for matrix types
+    n2 = len(eye.v_obj)
+    n = int(n2**0.5)
+    assert n * n == n2
+    for i in range(n):
+        for j in range(n):
+            if i == j:
+                cgpt.lattice_set_to_identity(eye.v_obj[i * n + j])
+            else:
+                cgpt.lattice_set_to_number(eye.v_obj[i * n + j], 0.0)
     return eye
 
 

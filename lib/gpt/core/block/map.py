@@ -59,6 +59,7 @@ class map:
 
         self.project = gpt.matrix_operator(
             mat=_project,
+            adj_mat=_promote,
             vector_space=(
                 gpt.vector_space.explicit_grid_otype(coarse_grid, c_otype),
                 gpt.vector_space.explicit_lattice(basis[0]),
@@ -68,6 +69,7 @@ class map:
 
         self.promote = gpt.matrix_operator(
             mat=_promote,
+            adj_mat=_project,
             vector_space=(
                 gpt.vector_space.explicit_lattice(basis[0]),
                 gpt.vector_space.explicit_grid_otype(coarse_grid, c_otype),
@@ -88,7 +90,7 @@ class map:
         for i, v in enumerate(self.basis):
             iproj @= self.project * v
             eproj[:] = 0.0
-            eproj[:, :, :, :, i] = 1.0
+            eproj[tuple([slice(None, None, None)] * self.coarse_grid.nd + [i])] = 1.0
             err2 = gpt.norm2(eproj - iproj)
             if tol is not None:
                 assert err2 <= tol

@@ -67,7 +67,7 @@ class fgmres(base_iterative):
     def restart(self, mat, psi, mmpsi, src, r, V, Z, gamma, t):
         r2 = self.calc_res(mat, psi, mmpsi, src, r, t)
         t("restart - misc")
-        gamma[0] = r2 ** 0.5
+        gamma[0] = r2**0.5
         V[0] @= r / gamma[0]
         t("restart - zero")
         if Z is not None:
@@ -84,12 +84,15 @@ class fgmres(base_iterative):
     def __call__(self, mat):
 
         vector_space = None
-        if type(mat) == g.matrix_operator:
-            vector_space = mat.vector_space
-            mat = mat.mat
-            # remove wrapper for performance benefits
 
         prec = self.prec(mat) if self.prec is not None else None
+
+        if isinstance(mat, g.matrix_operator):
+            vector_space = mat.vector_space
+            mat = mat.specialized_singlet_callable()
+
+        if isinstance(prec, g.matrix_operator):
+            prec = prec.specialized_singlet_callable()
 
         @self.timed_function
         def inv(psi, src, t):
@@ -130,7 +133,7 @@ class fgmres(base_iterative):
                 ssq = r2
 
             # target residual
-            rsq = self.eps ** 2.0 * ssq
+            rsq = self.eps**2.0 * ssq
 
             for k in range(self.maxiter):
                 # iteration within current krylov space
@@ -141,6 +144,7 @@ class fgmres(base_iterative):
 
                 t("prec")
                 if prec is not None:
+                    ZV[i][:] = 0
                     prec(ZV[i], V[i])
 
                 t("mat")

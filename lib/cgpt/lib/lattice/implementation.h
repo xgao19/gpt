@@ -55,6 +55,10 @@ public:
     cgpt_set_to_number(l,val);
   }
 
+  void set_to_identity() {
+    l = 1.0;
+  }
+
   virtual void axpy(ComplexD a, cgpt_Lattice_base* x, cgpt_Lattice_base* y) {
     return ::axpy(l,(Coeff_t)a,compatible<T>(x)->l,compatible<T>(y)->l);
   }
@@ -139,8 +143,8 @@ public:
     l = Cshift(src->l, dir, off);
   }
 
-  virtual PyObject* sum() {
-    return cgpt_numpy_export( ::sum(l) );
+  virtual PyObject* rank_sum() {
+    return cgpt_numpy_export( ::rankSum(l) );
   }
 
   virtual PyObject* to_str() {
@@ -151,16 +155,16 @@ public:
     cgpt_lattice_convert_from(l,src);
   }
 
-  virtual PyObject* slice(std::vector<cgpt_Lattice_base*> _basis, int dim) {
+  virtual PyObject* rank_slice(std::vector<cgpt_Lattice_base*> _basis, int dim) {
     PVector<Lattice<T>> basis;
     cgpt_basis_fill(basis, _basis);
-    return cgpt_lattice_slice(basis, dim);
+    return cgpt_lattice_rank_slice(basis, dim);
   }
 
-  virtual PyObject* indexed_sum(std::vector<cgpt_Lattice_base*> _basis, cgpt_Lattice_base* _idx, long len) {
+  virtual PyObject* rank_indexed_sum(std::vector<cgpt_Lattice_base*> _basis, cgpt_Lattice_base* _idx, long len) {
     PVector<Lattice<T>> basis;
     cgpt_basis_fill(basis, _basis);
-    return cgpt_lattice_indexed_sum(basis, compatible<iSinglet<vCoeff_t>>(_idx)->l, len);
+    return cgpt_lattice_rank_indexed_sum(basis, compatible<iSinglet<vCoeff_t>>(_idx)->l, len);
   }
 
   virtual void ferm_to_prop(cgpt_Lattice_base* prop, int spin, int color, bool f2p) {
@@ -265,6 +269,10 @@ public:
   
   virtual GridBase* get_grid() {
     return l.Grid();
+  }
+
+  virtual cgpt_stencil_matrix_base* stencil_matrix(GridBase* grid, PyObject* shifts, PyObject* code) {
+    return cgpt_stencil_matrix_create<T>(grid, shifts, code);
   }
 
 };

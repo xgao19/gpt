@@ -24,9 +24,11 @@ class local_coordinates(numpy.ndarray):
     pass
 
 
-def coordinates(o, order="lexicographic"):
+def coordinates(o, order="lexicographic", margin_top=None, margin_bottom=None):
     if type(o) == gpt.grid and o.cb.n == 1:
-        return coordinates((o, gpt.none), order=order)
+        return coordinates(
+            (o, gpt.none), order=order, margin_top=margin_top, margin_bottom=margin_bottom
+        )
     elif type(o) == tuple and type(o[0]) == gpt.grid and len(o) == 2:
         dim = len(o[0].ldimensions)
         cb = o[1].tag
@@ -34,12 +36,30 @@ def coordinates(o, order="lexicographic"):
         cbf = [o[0].fdimensions[i] // o[0].gdimensions[i] for i in range(dim)]
         top = [o[0].processor_coor[i] * o[0].ldimensions[i] * cbf[i] for i in range(dim)]
         bottom = [top[i] + o[0].ldimensions[i] * cbf[i] for i in range(dim)]
-        return cgpt.coordinates_from_cartesian_view(top, bottom, checker_dim_mask, cb, order).view(
-            local_coordinates
-        )
+
+        if margin_top is not None:
+            top = [t - m for t, m in zip(top, margin_top)]
+        if margin_bottom is not None:
+            bottom = [b + m for b, m in zip(bottom, margin_bottom)]
+
+        x = cgpt.coordinates_from_cartesian_view(top, bottom, checker_dim_mask, cb, order)
+
+        if margin_top is None and margin_bottom is None:
+            x = x.view(local_coordinates)
+        else:
+            L = numpy.array(o[0].gdimensions, dtype=numpy.int32)
+            x = numpy.mod(x, L)
+
+        return x
     elif type(o) == gpt.lattice:
-        return coordinates((o.grid, o.checkerboard()), order=order)
+        return coordinates(
+            (o.grid, o.checkerboard()),
+            order=order,
+            margin_top=margin_top,
+            margin_bottom=margin_bottom,
+        )
     elif type(o) == gpt.cartesian_view:
+        assert margin_top is None and margin_bottom is None
         return cgpt.coordinates_from_cartesian_view(
             o.top, o.bottom, o.checker_dim_mask, o.cb, order
         )
@@ -173,7 +193,10 @@ def coordinate_mask(field, mask):
 
 
 def correlate(a, b, dims=None):
-    # c[x] = (1/vol) sum_y a[y]*b[y+x]
+    # c[x] = (1/vol) sum_y a[y]*adj(b[y+x])
     F = gpt.fft(dims=dims)
-    G = gpt.adj(F)
-    return F(gpt(F(a) * G(b)))
+    if dims is not None:
+        norm = numpy.prod([a.grid.gdimensions[d] for d in dims])
+    else:
+        norm = a.grid.fsites
+    return F(gpt(float(norm) * F(a) * gpt.adj(F(b))))

@@ -133,6 +133,36 @@ class ot_matrix_spin(ot_base):
             "ot_singlet": (lambda: self, None),
         }
 
+    def cartesian(self):
+        return self
+
+    def compose(self, a, b):
+        return a + b
+
+    def defect(self, field):
+        return 0.0
+
+    def inner_product(self, left, right):
+        # adj(left_{ij}) = a_{ij} - i b_{ij}
+        # right_{ij} = c_{ij} + i d_{ij}
+        return gpt.sum(gpt(gpt.trace(gpt.adj(left) * right))).real
+
+    def generators(self, dt):
+        r = []
+
+        ndim = self.shape[0]
+        for i in range(ndim):
+            for j in range(ndim):
+                alg = numpy.zeros(shape=self.shape, dtype=dt)
+                alg[i, j] = 1.0
+                r.append(alg)
+
+                alg = numpy.zeros(shape=self.shape, dtype=dt)
+                alg[i, j] = 1.0j
+                r.append(alg)
+
+        return [gpt.gpt_object(i, self) for i in r]
+
     def identity(self):
         return gpt.matrix_spin(numpy.identity(self.shape[0]), self.shape[0])
 
@@ -183,6 +213,12 @@ class ot_matrix_spin_color(ot_base):
             "ot_singlet": (lambda: self, None),
         }
 
+    def cartesian(self):
+        return self
+
+    def compose(self, a, b):
+        return a + b
+
     def identity(self):
         return gpt.matrix_spin_color(
             numpy.multiply.outer(numpy.identity(self.shape[0]), numpy.identity(self.shape[2])),
@@ -231,15 +267,13 @@ class ot_vector_spin_color(ot_base):
             dst_sc = [gpt.gpt_object(dst_grid, self) for i in range(n_dst)]
             src_sc = [gpt.gpt_object(src_grid, self) for i in range(n_src)]
 
-            if zero_lhs:
-                for idx in range(n_dst):
-                    dst_sc[idx][:] = 0
-
             for i in range(len(src)):
                 for s in range(self.spin_ndim):
                     for c in range(self.color_ndim):
                         idx = c + self.color_ndim * (s + self.spin_ndim * i)
                         gpt.qcd.prop_to_ferm(src_sc[idx], src[i], s, c)
+                        if zero_lhs:
+                            gpt.qcd.prop_to_ferm(dst_sc[idx], dst[i], s, c)
 
             mat(dst_sc, src_sc)
 

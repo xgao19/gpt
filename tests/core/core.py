@@ -29,6 +29,11 @@ for rb in [g.redblack, g.full]:
     eps2 = g.norm2(l_dp[0, 0, 0, 0] - l_sp[0, 0, 0, 0])
     assert eps2 < 1e-14
 
+    # communication test
+    x = np.array([l_dp.grid.processor * 0.23 + 3], dtype=np.complex128)
+    eps = np.linalg.norm(l_dp.grid.reduce(x, lambda a, b: a.__iadd__(b)) - l_dp.grid.globalsum(x))
+    assert eps < 1e-14
+
 
 ################################################################################
 # Test mview
@@ -204,8 +209,8 @@ for t in range(L[3]):
 # Test correlate
 ################################################################################
 def correlate_test_3d(a, b, x):
-    # c[x] = (1/vol) sum_y a[y]*b[y+x]
-    bprime = b
+    # c[x] = (1/vol) sum_y a[y]*adj(b[y+x])
+    bprime = g(g.adj(b))
     L = a.grid.gdimensions
     vol = L[0] * L[1] * L[2]
     for i in range(3):
@@ -215,8 +220,8 @@ def correlate_test_3d(a, b, x):
 
 
 def correlate_test_4d(a, b, x):
-    # c[x] = (1/vol) sum_y a[y]*b[y+x]
-    bprime = b
+    # c[x] = (1/vol) sum_y a[y]*adj(b[y+x])
+    bprime = g(g.adj(b))
     L = a.grid.gdimensions
     vol = L[0] * L[1] * L[2] * L[3]
     for i in range(4):
