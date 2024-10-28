@@ -84,7 +84,7 @@ then
 	cd build
 #	../configure --enable-precision=double --enable-simd=AVX2 --enable-comms=none --with-lime=${dep}/lime \
 #		     CXXFLAGS="-fPIC "
-	../configure --enable-precision=double --enable-simd=AVX2 --enable-comms=none --disable-gparity --disable-fermion-reps CXXFLAGS="-fPIC"
+	../configure --enable-precision=double --enable-simd=AVX2 --enable-comms=none --disable-gparity --disable-fermion-reps --enable-reduction=mpi CXXFLAGS="-fPIC"
 	cd Grid
 	make -j 2
 fi
