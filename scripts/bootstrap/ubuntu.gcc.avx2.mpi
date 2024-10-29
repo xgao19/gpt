@@ -84,9 +84,9 @@ then
 	cd build
 #	../configure --enable-precision=double --enable-simd=AVX2 --enable-comms=none --with-lime=${dep}/lime \
 #		     CXXFLAGS="-fPIC "
-	../configure --enable-precision=double --enable-simd=AVX2 --enable-comms=none --disable-gparity --disable-fermion-reps --enable-reduction=mpi CXXFLAGS="-fPIC"
+	../configure --enable-precision=double --enable-simd=AVX2 --enable-comms=mpi-auto CXXFLAGS="-fPIC" MPICXX=mpicxx
 	cd Grid
-	make -j 2
+	make -j 6
 fi
 
 if [ ! -f ${root}/lib/cgpt/build/cgpt.so ];
@@ -95,7 +95,7 @@ then
 	# cgpt
 	#
 	cd ${root}/lib/cgpt
-	./make ${root}/dependencies/Grid/build 2
+	./make ${root}/dependencies/Grid/build 6
 fi
 
 cd ${root}/tests
