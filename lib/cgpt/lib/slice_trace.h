@@ -50,16 +50,11 @@ inline void cgpt_slice_trace_sums(const PVector<Lattice<vobj>> &Data,
   assert(orthogdim >= 0);
   assert(orthogdim < Nd);
   
-  std::cout << GridLogMessage << "What is this?? "<<std::endl;
 
   int fd = grid->_fdimensions[orthogdim];
   int ld = grid->_ldimensions[orthogdim];
   int rd = grid->_rdimensions[orthogdim];
  
-  std::cout << "fd = " << fd << std::endl;
-  std::cout << "ld = " << ld << std::endl;
-  std::cout << "rd = " << rd << std::endl;
-
   Vector<vobj> lvSum(rd * Nbasis);         // will locally sum vectors first
   Vector<sobj> lsSum(ld * Nbasis, Zero()); // sum across these down to scalars
   result.resize(fd * Nbasis);              // And then global sum to return the same vector to every node
@@ -69,33 +64,17 @@ inline void cgpt_slice_trace_sums(const PVector<Lattice<vobj>> &Data,
   int  stride = grid->_slice_stride[orthogdim];
   int ostride = grid->_ostride[orthogdim];
 
-  std::cout << "e1 = " << e1 << std::endl;
-  std::cout << "e2 = " << e2 << std::endl;
-  std::cout << "stride = " << stride << std::endl;
-  std::cout << "ostride = " << ostride << std::endl;
 
-  // sum over reduced dimension planes, breaking out orthog dir
-  // Parallel over orthog direction
-  VECTOR_VIEW_OPEN(Data, Data_v, AcceleratorRead);
-  //open normal view for the 2nd propagator
-  // autoView(Data2_v, Data2,AcceleratorRead);
-  auto lvSum_p = &lvSum[0];
-  typedef decltype(coalescedRead(Data_v[0][0])) CalcElem;
+  size_t subvol_size = e1*e2;
+  std::vector<vobj> mysum(rd);
 
-  accelerator_for(r, rd * Nbasis, (size_t)grid->Nsimd(), {
-    CalcElem elem = Zero();
+  for (int nbasis = 0; nbasis < Nbasis; nbasis++) {
+    sliceSumReduction(Data[nbasis],mysum, rd, e1, e2, stride, ostride, Nsimd);
 
-    int n_base = r / rd;
-    int so = (r % rd) * ostride; // base offset for start of plane
-    for(int n = 0; n < e1; n++){
-      for(int b = 0; b < e2; b++){
-        int ss = so + n * stride + b;
-        elem += coalescedRead(Data_v[n_base][ss]);
-      }
+    for (int r = 0; r<rd; r++) {
+      lvSum[r+rd*nbasis] = mysum[r];
     }
-    coalescedWrite(lvSum_p[r], elem);
-  });
-  VECTOR_VIEW_CLOSE(Data_v);
+  }
 
   thread_for(n_base, Nbasis, {
     // Sum across simd lanes in the plane, breaking out orthog dir.
