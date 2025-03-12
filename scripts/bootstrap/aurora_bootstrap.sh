@@ -11,7 +11,13 @@ function check_package {
 	fi
 }
 #module load oneapi/eng-compiler/2023.12.15.002 python py-numpy
-module load python py-numpy fftw mpich/51.2/icc-all-deterministic-pmix-gpu
+module load python py-numpy fftw pti-gpu
+source ~/spack/share/spack/setup-env.sh
+#spack load c-lime
+spack load openssl
+#export CLIME=`spack find --paths c-lime | grep ^c-lime | awk '{print $2}' `
+export SYCL_PROGRAM_COMPILE_OPTIONS="-ze-opt-large-register-file"
+
 #module load python
 #module load py-numpy
 #module load PrgEnv-gnu craype-accel-amd-gfx90a amd-mixed rocm cray-python cray-mpich craype-x86-trento cray-fftw
@@ -89,7 +95,8 @@ then
 	cd build
 	TOOLS=$HOME/tools
 	../configure \
-        --enable-simd=GPU \
+            --enable-simd=GPU \
+	    --enable-reduction=grid \
         --enable-gen-simd-width=64 \
         --enable-comms=mpi-auto \
         --enable-accelerator-cshift \
@@ -98,10 +105,11 @@ then
         --enable-shm=nvlink \
         --enable-accelerator=sycl \
         --enable-unified=no \
+	--enable-accelerator-aware-mpi=no \
         MPICXX=mpicxx \
         CXX=icpx \
-        LDFLAGS="-fiopenmp -fsycl -fsycl-device-code-split=per_kernel -fsycl-device-lib=all -lze_loader -fPIC" \
-        CXXFLAGS="-fiopenmp -fsycl-unnamed-lambda -fsycl -Wno-tautological-compare -fPIC"
+        LDFLAGS="-fiopenmp -fsycl -fsycl-device-code-split=per_kernel -fsycl-device-lib=all -lze_loader -L${MKLROOT}/lib -qmkl=parallel -fsycl -lsycl -fPIC" \
+        CXXFLAGS="-O3 -fiopenmp -fsycl-unnamed-lambda -fsycl -Wno-tautological-compare -qmkl=parallel -fsycl -fno-exceptions -fPIC"
 
 	cd Grid
 	make -j 32
