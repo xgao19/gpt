@@ -19,3 +19,5 @@
 from gpt.algorithms.group.symmetric_functional import symmetric_functional
 from gpt.algorithms.group.locally_coherent_functional import locally_coherent_functional
 from gpt.algorithms.group.repeat_arguments_functional import repeat_arguments_functional
+from gpt.algorithms.group.polar_decomposition_functional import polar_decomposition_functional
+from gpt.algorithms.group.polar_regulator import polar_regulator

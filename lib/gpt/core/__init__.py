@@ -29,7 +29,7 @@ from gpt.core.peekpoke import map_key
 from gpt.core.tensor import tensor
 from gpt.core.epsilon import epsilon, sign_of_permutation
 from gpt.core.gamma import gamma, gamma_base
-from gpt.core.time import time, timer
+from gpt.core.time import time, timer, profile_reset, profile_save
 from gpt.core.log import message
 from gpt.core.auto_tune import auto_tuned_class, auto_tuned_method
 from gpt.core.pin import pin
@@ -82,6 +82,7 @@ from gpt.core.io import (
     format,
     mview,
     FILE,
+    FILE_exists,
     LoadError,
     gpt_io,
     corr_io,
@@ -110,6 +111,7 @@ from gpt.core.coordinates import (
 )
 from gpt.core.random import random, sha256
 from gpt.core.mem import mem_info, mem_report, accelerator, host
+from gpt.core.accelerator_buffer import accelerator_buffer
 from gpt.core.merge import *
 from gpt.core.split import *
 import gpt.core.domain
@@ -126,3 +128,5 @@ from gpt.core.padding import padded_local_fields
 import gpt.core.stencil
 from gpt.core.einsum import einsum
 import gpt.core.global_sum
+from gpt.core.pack import pack
+from gpt.core.blas import blas

@@ -61,7 +61,7 @@ g.message("Group defect:", eps)
 assert eps < 1e-10
 
 ngen = len(U_mom[0].otype.generators(np.complex128))
-v = g(U_mom[0] * A0.m**0.5)
+v = g(U_mom[0] * A0.inv_mass**0.5)
 x = g.sum(g(g.trace(g.adj(v) * v) * 2.0 / ngen)).real / U_mom[0].grid.gsites
 eps = abs(x - 1)
 g.message("Compare variance:", x, eps)
@@ -183,6 +183,8 @@ for mu in range(8):
     g.message(f"Test laplacian: {eps}")
     assert eps < 1e-10
 
+
+lap = g.qcd.gauge.algebra_laplace_polynomial(U, 1.5, [-0.1, -0.2, -0.5])
 cg = g.algorithms.inverter.block_cg({"eps": 1e-12, "maxiter": 100})
 slap = g.matrix_operator(
     mat=lap, inv_mat=lap.inverse(cg), accept_list=True, accept_guess=(False, True)
@@ -196,7 +198,9 @@ def slap2_pgrad(U, vec):
     return [g(2 * x) for x in grad1]
 
 
-A2 = g.qcd.scalar.action.general_mass_term(M=slap2, sqrt_M=slap, M_projected_gradient=slap2_pgrad)
+A2 = g.qcd.scalar.action.general_mass_term(
+    inv_M=slap2, sqrt_inv_M=slap, inv_M_projected_gradient=slap2_pgrad
+)
 
 A2.assert_gradient_error(rng, U + U_mom, U + U_mom, 1e-3, 1e-8)
 

@@ -204,7 +204,7 @@ jobs:
 
     - name: Setup python dependencies
       run: |
-        pip install numpy
+        pip install numpy h5py
 
     - name: c-lime package cache
       uses: actions/cache@v4
@@ -378,10 +378,10 @@ jobs:
 
     - name: Setup python dependencies
       run: |
-        pip install numpy coverage
+        pip install numpy coverage h5py
 
     - name: Download prebuild python-gpt
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: python-gpt-${{ runner.os }}-python-${{ matrix.python-version }}-${{ matrix.compiler }}-${{ matrix.mpi }}-${{ needs.build-gpt.outputs.python-gpt-version }}
 
@@ -411,6 +411,7 @@ jobs:
         export PYTHONPATH=/usr/local/lib/python${{ matrix.python-version}}/site-packages:/usr/local/lib64/python${{ matrix.python-version}}/site-packages
         export WORK_DIR=$(mktemp -d)
         mpirun -np 2 -mca btl ^openib -bind-to core python tests/core/scalar.py --mpi 1.1.1.2
+        # ./tests/run "mpirun -np 1 -mca btl ^openib coverage run" "--mpi_split 1.1.1.1"
         ./tests/run "mpirun -np 2 -bind-to core -mca btl ^openib coverage run" "--mpi 1.1.1.2 --mpi 1.1.2 --mpi 2 --mpi_split 1.1.1.1 --shm 256"
 
     - name: Run tests
@@ -419,6 +420,7 @@ jobs:
         export PYTHONPATH=/usr/local/lib/python${{ matrix.python-version}}/site-packages:/usr/local/lib64/python${{ matrix.python-version}}/site-packages
         cd gpt
         export WORK_DIR=$(mktemp -d)
+        # ./tests/run "mpirun -np 1 coverage run" "--mpi_split 1.1.1.1"
         ./tests/run "mpirun -np 2 -bind-to core coverage run" "--mpi 1.1.1.2 --mpi 1.1.2 --mpi 2 --mpi_split 1.1.1.1 --shm 256"
 
     - name: Coverage report
@@ -447,6 +449,7 @@ jobs:
 
 
   build-gpt-doc:
+    if: false
     needs: [build-grid, build-gpt]
     runs-on: ubuntu-22.04
 
@@ -467,7 +470,7 @@ jobs:
         pip install numpy sphinx ipython sphinxcontrib-napoleon
 
     - name: Download prebuild python-gpt
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: python-gpt-${{ runner.os }}-python-3.10-gcc-none-${{ needs.build-gpt.outputs.python-gpt-version }}
 
@@ -488,7 +491,7 @@ jobs:
         cd gpt/documentation
         make html
 
-    - uses: actions/upload-artifact@v3
+    - uses: actions/upload-artifact@v4
       with:
         name: documentation
         path: gpt/documentation/build
@@ -554,7 +557,7 @@ jobs:
 
       - name: Download prebuild python-gpt
         if: ${{ steps.check-build.outputs.build }}
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: python-gpt-${{ runner.os }}-python-3.10-${{ matrix.compiler }}-${{ matrix.mpi }}-${{ needs.build-gpt.outputs.python-gpt-version }}
 

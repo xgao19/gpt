@@ -32,7 +32,7 @@ W = n.random_weights(rng)
 training_input = [rng.cnormal(g.lattice(grid, ot_i)) for i in range(n_training)]
 training_output = [rng.cnormal(g.lattice(grid, ot_i)) for i in range(n_training)]
 
-c = n.cost()
+c = n.cost() + g.ml.regulator.L2(0.1, [1, 2])
 g.message("Cost:", c(W + training_input + training_output))
 
 c.assert_gradient_error(
@@ -67,6 +67,7 @@ paths = [
     g.path().backward(1),
     g.path().backward(2),
     g.path().backward(3),
+    g.path().forward(1, 3),
     g.path().f(0).f(1).b(0).b(1),
 ]
 
@@ -77,12 +78,22 @@ ot_w = g.ot_matrix_spin(4)
 n = g.ml.model.sequence(
     g.ml.layer.parallel_transport_convolution(grid, U, paths, ot_i, ot_w, 1, 3),
     g.ml.layer.parallel_transport_convolution(grid, U, paths, ot_i, ot_w, 3, 3),
+    g.ml.layer.residual(
+        g.ml.layer.linear(grid, ot_i, ot_w, 3, 1 + len(paths) - 1),
+        g.ml.layer.parallel_transport(grid, U, paths[0:-1], ot_i),
+        g.ml.layer.linear(grid, ot_i, ot_w, 1 + len(paths) - 1, 3),
+    ),
     g.ml.layer.parallel_transport_convolution(grid, U, paths, ot_i, ot_w, 3, 1),
 )
 
 n_prime = g.ml.model.sequence(
     g.ml.layer.parallel_transport_convolution(grid, U_prime, paths, ot_i, ot_w, 1, 3),
     g.ml.layer.parallel_transport_convolution(grid, U_prime, paths, ot_i, ot_w, 3, 3),
+    g.ml.layer.residual(
+        g.ml.layer.linear(grid, ot_i, ot_w, 3, 1 + len(paths) - 1),
+        g.ml.layer.parallel_transport(grid, U_prime, paths[0:-1], ot_i),
+        g.ml.layer.linear(grid, ot_i, ot_w, 1 + len(paths) - 1, 3),
+    ),
     g.ml.layer.parallel_transport_convolution(grid, U_prime, paths, ot_i, ot_w, 3, 1),
 )
 
@@ -100,7 +111,7 @@ assert eps < 1e-13
 n_training = 3
 training_output = [rng.normal(g.lattice(grid, ot_i)) for i in range(n_training)]
 training_input = [rng.normal(g.lattice(grid, ot_i)) for i in range(n_training)]
-c = n.cost()
+c = n.cost() + g.ml.regulator.L1(0.1, [0])
 
 c.assert_gradient_error(rng, W + training_input + training_output, W, 1e-3, 1e-8)
 

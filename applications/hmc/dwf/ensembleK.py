@@ -6,6 +6,8 @@ import os, sys, shutil
 g.default.set_verbose("defect_correcting_convergence")
 g.default.set_verbose("cg_log_convergence")
 
+visualization = g.default.has("--visualization")
+
 rng = g.random("test")
 
 # cold start
@@ -86,6 +88,125 @@ if False:
     g.save(f"{dst}/ckpoint_lat.{it0}", U, g.format.nersc())
     sys.exit(0)
 
+
+
+
+######### INSERT TEST CODE
+
+
+def D_DWF(dst, src, U, b, c, mass, M5):
+    src_s = g.separate(src, 0)
+    dst_s = [g.lattice(s) for s in src_s]
+
+    D_W = g.qcd.fermion.reference.wilson_clover(U, mass=-M5, csw_r=0.0, csw_t=0.0, nu=1.0, xi_0=1.0,
+                                                isAnisotropic=False,
+                                                boundary_phases=[1,1,1,-1])
+
+    Ls = len(src_s)
+    
+    src_plus_s = []
+    src_minus_s = []
+    for s in range(Ls):
+        src_plus_s.append(g(0.5 * src_s[s] + 0.5 * g.gamma[5]*src_s[s]))
+        src_minus_s.append(g(0.5 * src_s[s] - 0.5 * g.gamma[5]*src_s[s]))
+    for d in dst_s:
+        d[:] = 0
+    for s in range(Ls):
+        dst_s[s] += b*D_W* src_s[s] + src_s[s]
+    for s in range(1,Ls):
+        dst_s[s] += c*D_W * src_plus_s[s-1] - src_plus_s[s-1]
+    for s in range(0,Ls-1):
+        dst_s[s] += c*D_W * src_minus_s[s+1] - src_minus_s[s+1]
+    dst_s[0] -= mass*(c*D_W * src_plus_s[Ls-1] - src_plus_s[Ls-1])
+    dst_s[Ls-1] -= mass*(c*D_W * src_minus_s[0] - src_minus_s[0])
+            
+    dst @= g.merge(dst_s, 0)
+
+def test_reference():
+    Ls = 12
+    b = 1.5
+    c = 0.5
+    M5 = 1.8
+    mass = 0.123
+    mobius = g.qcd.fermion.mobius(
+        U,
+        Ls=Ls,
+        mass=mass,
+        b=b,
+        c=c,
+        M5=M5,
+        boundary_phases=[1,1,1,-1]
+    )
+
+    src = rng.cnormal(g.vspincolor(mobius.F_grid))
+    dst = g(mobius * src)
+
+    dst_ref = g.lattice(dst)
+    dst_ref[:] = 0
+    D_DWF(dst_ref, src, U, b, c, mass, M5)
+
+    eps = (g.norm2(dst_ref - dst) / g.norm2(dst_ref)) ** 0.5
+    g.message(f"Test mobius implementation: {eps}")
+    if eps > 1e-13:
+
+        eps = (g.object_rank_norm2(dst_ref - dst) / g.object_rank_norm2(dst_ref)) ** 0.5
+        if eps > 1e-13:
+            sys.stderr.write(f"ERROR {eps} on rank {grid.processor} is host {socket.gethostname()}\n")
+            sys.stderr.flush()
+        g.barrier()
+        sys.exit(1)
+
+test_reference()
+
+########## END TEST CODE
+
+
+# first estimate based on crude E extrapolation, likely 4% off for m_l and m_s:
+#( (0.0003546 + 0.0176)/27.34 - 0.0003546) = 0.00030211543525969275
+
+# new estimation based on global fit should do better:
+# m_s = 0.01682836
+# m_l = 0.00028884
+
+if latest_it <= 603:
+    g.message("Use first-generation masses")
+    m_l = 0.000302
+    m_s = 0.0176
+    b = 1.5
+    c = 0.5
+
+elif latest_it <= 615:
+    g.message("Use second-generation masses")
+
+    # global fit estimate (mk)
+    # m_l = 0.000289
+    # m_s = 0.0168
+
+    # simple estimate via m_SS msw0Zh dependence ; then use 27.2 as quark mass ratio incl. m_res
+    # m_l = 0.000282
+    # m_s = 0.0170   (another estimate mk5 agrees with this)
+
+    m_l = 0.000286
+    m_s = 0.0169
+    b = 1.5
+    c = 0.5
+
+elif latest_it <= 621:
+    g.message("Use third-generation masses")
+    m_l = 0.000262
+    m_s = 0.01643
+    b = 1.5
+    c = 0.5
+
+else:
+    g.message("Use fourth-generation masses and alpha")
+    m_l = 0.0005464
+    m_s = 0.016715
+    b = 1.25
+    c = 0.25
+
+
+    
 ckp = g.checkpointer(f"{dst}/checkpoint2")
 ckp.grid = U[0].grid
 
@@ -127,8 +248,8 @@ def light(U0, m_plus, m_minus):
         mass_plus=m_plus,
         mass_minus=m_minus,
         M5=1.8,
-        b=1.5,
-        c=0.5,
+        b=b,
+        c=c,
         Ls=12,
         boundary_phases=[1, 1, 1, -1],
     )
@@ -145,9 +266,14 @@ F_grid_eo = lq.F_grid_eo
 F_grid = lq.F_grid
 lq = None
 
-sloppy_prec = 1e-8
-sloppy_prec_light = 1e-7
-exact_prec = 1e-10
+sloppy_prec = 1e-9
+sloppy_prec_light = 1e-9
+exact_prec = 1e-11
+
+# test after 624 to go down from two dH \approx 2-3 in a row, if this does not help, increase number of steps
+sloppy_prec = 1e-10
+sloppy_prec_light = 1e-10
+exact_prec = 1e-12
 
 cg_s_inner = inv.cg({"eps": 1e-4, "eps_abs": sloppy_prec * 0.15, "maxiter": 40000, "miniter": 50})
 cg_s_light_inner = inv.cg({"eps": 1e-4, "eps_abs": sloppy_prec_light * 0.15, "maxiter": 40000, "miniter": 50})
@@ -161,7 +287,7 @@ cg_s = inv.defect_correcting(
 
 cg_s_light = inv.defect_correcting(
     inv.mixed_precision(cg_s_light_inner, g.single, g.double),
-    eps=sloppy_prec,
+    eps=sloppy_prec_light,
     maxiter=100,
 )
 
@@ -208,10 +334,8 @@ U_mom = g.group.cartesian(U)
 
 action_gauge_mom = g.qcd.scalar.action.mass_term()
 action_gauge = g.qcd.gauge.action.iwasaki(2.44)  # changed from 2.41 at traj=295
-#( (0.0003546 + 0.0176)/27.34 - 0.0003546) = 0.00030211543525969275
 
-
-rat = g.algorithms.rational.zolotarev_inverse_square_root(1.0**0.5, 70.0**0.5, 9)
+rat = g.algorithms.rational.zolotarev_inverse_square_root(1.0**0.5, 70.0**0.5, 11)
 # before 11 highest, led to 1e-9 error, 6 led to 1.2435650287301314e-08,
 # 13 led to 8e-10, 20 to 1.320967779605553e-10, 3 to 7.120046807695957e-08
 # ran power method below, seems like 70 is best upper level
@@ -259,18 +383,19 @@ def store_cfields(tag, flds):
     ckp_css.grid = U[0].grid
 
     for i in range(len(flds)):
-        flds.save(flds[i])
+        ckp_css.save(flds[i])
 
 def load_cfields(tag, flds):
-    if not os.path.exists(f"{dst}/checkpoint.{tag}"):
+    if os.path.exists(f"{dst}/checkpoint.{tag}"):
         ckp_css = g.checkpointer(f"{dst}/checkpoint.{tag}")
         ckp_css.grid = U[0].grid
 
-        for i in range(len(flds)):
-            if not ckp_css.load(flds[i]):
-                return False
-    g.message(f"Successfully restored {tag}")
-    return True
+        if not ckp_css.load(flds):
+            return False
+        g.message(f"Successfully restored {tag}")
+        return True
+    return False
+
 
 
 load_css()
@@ -282,9 +407,9 @@ hasenbusch_ratios = [  # Nf=2+1
     (0.017, 0.11, None, two_flavor_ratio, mk_chron(cg_e, *css[0]), mk_chron(cg_s, *css[0]), light),
     (0.004, 0.017, None, two_flavor_ratio, mk_chron(cg_e, *css[0]), mk_chron(cg_s, *css[0]), light),
     (0.0019, 0.004, None, two_flavor_ratio, mk_chron(cg_e, *css[1]), mk_chron(cg_s, *css[1]), light),
-    (0.000302, 0.0019, None, two_flavor_ratio, mk_chron(cg_e, *css[1]), mk_chron(cg_s_light, *css[1]), light),
+    (m_l, 0.0019, None, two_flavor_ratio, mk_chron(cg_e, *css[1]), mk_chron(cg_s_light, *css[1]), light),
     (0.23, 1.0, rat_fnc, eofa_ratio, mk_slv_e(*css[2]), mk_slv_s(*css[2]), light),
-    (0.0176, 0.23, rat_fnc, eofa_ratio, mk_slv_e(*css[2]), mk_slv_s(*css[2]), light),
+    (m_s, 0.23, rat_fnc, eofa_ratio, mk_slv_e(*css[2]), mk_slv_s(*css[2]), light),
 ]
 
 fields = [
@@ -325,6 +450,31 @@ metro = g.algorithms.markov.metropolis(rng)
 
 pure_gauge = True
 
+force_visualization = {}
+
+class gradient_density_logger(g.core.group.diffeomorphism): # TODO: move to g.core.group
+    def __init__(self, storage, tag):
+        self.storage = storage
+        self.tag = tag
+        
+    def __call__(self, fields):
+        # do nothing
+        return fields
+
+    # apply the jacobian
+    def jacobian(self, fields, fields_prime, src):
+        density = None
+        for s in src:
+            d = g(g.trace(g.adj(s) * s))
+            if density is None:
+                density = d
+            else:
+                density += d
+        self.storage[self.tag] = density
+
+        return src
+
+
 def transform(aa, s, i):
     aa_transformed = aa[i].transformed(s, indices=list(range(len(U))))
     aa_orig = aa[i]
@@ -334,7 +484,13 @@ def transform(aa, s, i):
         return x
     aa_transformed.draw = draw
     aa[i] = aa_transformed
-    
+
+if visualization:
+    action_gauge = action_gauge.transformed(gradient_density_logger(force_visualization, "gauge_U"))
+    for i in range(len(hasenbusch_ratios)):
+        m1, m2, *rest = hasenbusch_ratios[i]
+        transform(action_fermions_s, gradient_density_logger(force_visualization, f"fermion_{m1}_over_{m2}_U"), i)
+
 a_log_det = None
 for s in sm:
     action_gauge = action_gauge.transformed(s)
@@ -345,6 +501,13 @@ for s in sm:
         a_log_det = s.action_log_det_jacobian()
     else:
         a_log_det = a_log_det.transformed(s) + s.action_log_det_jacobian()
+
+if visualization:
+    action_gauge = action_gauge.transformed(gradient_density_logger(force_visualization, "gauge_U_integration"))
+    a_log_det = a_log_det.transformed(gradient_density_logger(force_visualization, "log_det_U_integration"))
+    for i in range(len(hasenbusch_ratios)):
+        m1, m2, *rest = hasenbusch_ratios[i]
+        transform(action_fermions_s, gradient_density_logger(force_visualization, f"fermion_{m1}_over_{m2}_U_integration"), i)
 
 def hamiltonian(draw):
     ald = a_log_det(U)
@@ -367,7 +530,7 @@ def hamiltonian(draw):
                     r = f"{hasenbusch_ratios[i][0]}/{hasenbusch_ratios[i][1]}"
                     e = abs(si / si_check - 1)
 
-                    g.message(f"Error of rational approximation for Hasenbusch ratio {r}: {e}")
+                    g.message(f"Error of rational approximation for Hasenbusch ratio {r}: {e} or absolute {si-si_check}")
                 else:
                     si = action_fermions_e[i].draw(fields[i], rng)
                 s += si
@@ -376,8 +539,9 @@ def hamiltonian(draw):
         s = action_gauge(U)
         if not pure_gauge:
             for i in range(len(hasenbusch_ratios)):
-                g.message(f"Calculate Hamiltonian for {hasenbusch_ratios[i][0]}/{hasenbusch_ratios[i][1]}")
-                s += action_fermions_e[i](fields[i])
+                sa = action_fermions_e[i](fields[i])
+                g.message(f"Calculate Hamiltonian for {hasenbusch_ratios[i][0]}/{hasenbusch_ratios[i][1]} = {sa}")
+                s += sa
         h = s + action_gauge_mom(U_mom) + ald
     return h, s
 
@@ -395,6 +559,7 @@ def fermion_force():
     for y in x:
         y[:] = 0
 
+    g.mem_report(details=False)
     if not pure_gauge:
         forces = [[g.lattice(y) for y in x] for i in fields]
 
@@ -403,6 +568,7 @@ def fermion_force():
             g.message(f"Hasenbusch ratio {hasenbusch_ratios[i][0]}/{hasenbusch_ratios[i][1]}")
             forces[i] = action_fermions_s[i].gradient(fields[i], fields[i][0 : len(U)])
             g.message("Ratio complete")
+            g.mem_report(details=False)
 
         g.message("Log Time")
         log.time()
@@ -448,13 +614,13 @@ iq = sympl.update_q(
 )
 
 ip_gauge = sympl.update_p(U_mom, gauge_force)
-ip_fermion = sympl.update_p(U_mom, fermion_force)
+ip_fermion = sympl.update_p(U_mom, fermion_force, tag="Q_fermion")
 ip_log_det = sympl.update_p(U_mom, log_det_force)
 ip_log_det_sp = sympl.update_p(U_mom, log_det_force_sp)
 
 ip_gauge_fg = sympl.update_p_force_gradient(U, iq, U_mom, ip_gauge, ip_gauge)
-ip_fermion_fg = sympl.update_p_force_gradient(U, iq, U_mom, ip_fermion, ip_fermion)
-ip_log_det_fg = sympl.update_p_force_gradient(U, iq, U_mom, ip_log_det, ip_log_det_sp)
+ip_fermion_fg = sympl.update_p_force_gradient(U, iq, U_mom, ip_fermion, ip_fermion, tag="Q_fg_fermion")
+ip_log_det_fg = sympl.update_p_force_gradient(U, iq, U_mom, ip_log_det, ip_log_det)#_sp
 
 mdint = sympl.OMF2_force_gradient(
     1, ip_fermion,
@@ -464,9 +630,14 @@ mdint = sympl.OMF2_force_gradient(
     ip_fermion_fg
 )
 
+g.message(mdint)
 
-no_accept_reject = True
 
+#no_accept_reject = True
+no_accept_reject = False
+
+tau = 8.0
+nsteps = 80
 
 def hmc(tau):
     global ff_iterator, ckp
@@ -480,20 +651,78 @@ def hmc(tau):
         params[-1] = s0
         ckp.save(params)
         store_css()
-        # sys.exit(0)
+        g.barrier()
+        sys.exit(0)
     else:
         h0, s0 = params[-2:]
     g.message("After H(true)",h0,s0)
-    for its in range(40):
-        g.message(f"tau-iteration: {its} -> {tau/40*its}")
-        if not ckp.load(params + U):
-            mdint(tau / 40)
-            ckp.save(params + U)
-            if it % 2 == 0:
-                store_css()
+    its0 = nsteps - 1
+    while its0 >= 0:
+        g.message(f"Try to load fields after iteration {its0}")
+        if load_cfields(f"{its0}", params + U):
+            break
+        its0 -= 1
+    its0 += 1
+    nrun = 0
+    for its in range(its0, nsteps):
+        g.message(f"tau-iteration: {its} -> {tau/nsteps*its}")
+        mdint(tau / nsteps)
 
-            store_cfields(f"{its}", params + U)
-            # sys.exit(0)
+        if visualization:
+            g.message("Visualization data output")
+            
+            if g.rank() == 0:
+                os.makedirs(f"{dst}/visualization/{it0}_to_{it0+1}/{its}_of_{nsteps}", exist_ok=True)
+
+            g.barrier()
+
+            g.message("Save U_integration")
+            
+            # save forces and gauge field
+            g.save(f"{dst}/visualization/{it0}_to_{it0+1}/{its}_of_{nsteps}/U_integration", U, g.format.nersc())
+
+            g.message("Create U")
+            Uft = U
+            for s in reversed(sm):
+                Uft = s(Uft)
+
+            g.message("Save U")
+
+            g.save(f"{dst}/visualization/{it0}_to_{it0+1}/{its}_of_{nsteps}/U", Uft, g.format.nersc())
+
+            for tag in force_visualization:
+                g.message(f"Save {tag}")
+                g.save(f"{dst}/visualization/{it0}_to_{it0+1}/{its}_of_{nsteps}/{tag}", force_visualization[tag], g.format.grid_scidac)
+
+                x = g.load(f"{dst}/visualization/{it0}_to_{it0+1}/{its}_of_{nsteps}/{tag}")
+                err = g.norm2(x - force_visualization[tag])
+                g.message("Check", err)
+                assert err == 0.0 # paranoid mode for new file format
+
+        
+            g.message("Done")
+
+        if its % 1 == 0: # temporarily check all of them
+            h1, s1 = hamiltonian(False)
+            g.message(f"dH = {h1-h0}")
+        else:
+            h1 = None
+        if g.rank() == 0:
+            flog = open(f"{dst}/current.log.{its}","wt")
+            if h1 is not None:
+                flog.write(f"dH_{its} = {h1} - {h0} = {h1-h0}\n")
+            for x in log.grad:
+                flog.write(f"{x} force norm2/sites = {np.mean(log.get(x))} +- {np.std(log.get(x))}\n")
+            flog.write(f"Timing:\n{log.time}\n")
+            flog.close()
+
+        store_cfields(f"{its}", params + U)
+        store_css()
+        nrun += 1
+        if nrun >= 2:
+            g.barrier()
+            sys.exit(0)
+
     g.message("After mdint(tau)")
     h1, s1 = hamiltonian(False)
     g.message("After H(false)")
@@ -503,14 +732,13 @@ def hmc(tau):
     else:
         return [accrej(h1, h0), s1 - s0, h1 - h0]
 
-
 accept, total = 0, 0
 for it in range(it0, N):
     pure_gauge = it < 10
     no_accept_reject = it < 1000
     g.message(pure_gauge, no_accept_reject)
 
-    a, dS, dH = hmc(8.0)
+    a, dS, dH = hmc(tau)
     accept += a
     total += 1
 
@@ -542,16 +770,22 @@ for it in range(it0, N):
         log.reset()
         g.message("Reset log")
 
-    # reset checkpoint
-    if g.rank() == 0:
-        shutil.rmtree(f"{dst}/checkpoint2")
-
+    g.save(f"{dst}/config.{it}", Uft)
+    
     g.barrier()
-    #ckp = g.checkpointer(f"{dst}/checkpoint2")
-    #ckp.grid = U[0].grid
 
     g.save(f"{dst}/ckpoint_lat.{it}", Uft, g.format.nersc())
-    store_css()
+
+    g.barrier()
+
+    # reset checkpoint
+    if g.rank() == 0:
+        #shutil.rmtree(f"{dst}/checkpoint2")
+        os.rename(f"{dst}/checkpoint2", f"{dst}/checkpoint2.restore")
+        for it in range(nsteps):
+            if os.path.exists(f"{dst}/checkpoint.{it}"):
+                #shutil.rmtree(f"{dst}/checkpoint.{it}")
+                os.rename(f"{dst}/checkpoint.{it}", f"{dst}/checkpoint.{it}.restore")
     
     #rng = g.random(f"new{dst}-{it}", "vectorized_ranlux24_24_64")
 
