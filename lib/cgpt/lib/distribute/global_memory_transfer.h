@@ -696,7 +696,7 @@ void global_memory_transfer<offset_t,rank_t,index_t>::bcopy(const std::vector<bc
       for (auto & bi : bc) {
 	for (size_t i=0;i<bi.blocks.size();i++) {
 	  auto&b=bi.blocks[i];
-	  acceleratorCopyFromDeviceAsync((void*)&bi.p_src[b.start_src],(void*)&bi.p_dst[b.start_dst],block_size);
+	  acceleratorCopyFromDeviceAsynch((void*)&bi.p_src[b.start_src],(void*)&bi.p_dst[b.start_dst],block_size);
 	}
       }
       acceleratorCopySynchronise();
@@ -705,7 +705,7 @@ void global_memory_transfer<offset_t,rank_t,index_t>::bcopy(const std::vector<bc
       for (auto & bi : bc) {
 	for (size_t i=0;i<bi.blocks.size();i++) {
 	  auto&b=bi.blocks[i];
-	  acceleratorCopyToDeviceAsync((void*)&bi.p_src[b.start_src],(void*)&bi.p_dst[b.start_dst],block_size);
+	  acceleratorCopyToDeviceAsynch((void*)&bi.p_src[b.start_src],(void*)&bi.p_dst[b.start_dst],block_size);
 	}
       }
       acceleratorCopySynchronise();
