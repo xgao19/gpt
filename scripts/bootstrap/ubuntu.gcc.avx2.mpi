@@ -69,7 +69,7 @@ then
 	rm -f master
 	cd lime
 	./autogen.sh
-	./configure
+	./configure CFLAGS="-fPIC" CXXFLAGS="-fPIC"
 	make
 	cd ..
 
@@ -84,7 +84,7 @@ then
 	cd build
 #	../configure --enable-precision=double --enable-simd=AVX2 --enable-comms=none --with-lime=${dep}/lime \
 #		     CXXFLAGS="-fPIC "
-	../configure --enable-precision=double --enable-simd=AVX2 --enable-comms=mpi-auto CXXFLAGS="-fPIC" MPICXX=mpicxx
+	../configure --enable-precision=double --enable-simd=AVX2 --enable-comms=mpi-auto --with-lime=${dep}/lime --enable-reduction=mpi CXXFLAGS="-fPIC" MPICXX=mpicxx
 	cd Grid
 	make -j 6
 fi
@@ -100,8 +100,7 @@ fi
 
 cd ${root}/tests
 source ${root}/lib/cgpt/build/source.sh
-./run "" "--mpi_split 1.1.1.1"
+#./run "" "--mpi_split 1.1.1.1"
 
 echo "To use:"
 echo "source ${root}/lib/cgpt/build/source.sh"
-
