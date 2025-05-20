@@ -48,7 +48,7 @@
 			 {						\
 			   auto iter1    = item.get_global_id(0);	\
 			   auto lane     = item.get_global_id(2);	\
-			   shared_type* shared_name = shm_acc.get_pointer(); \
+			   auto shared_name = shm_acc.get_multi_ptr<sycl::access::decorated::no>(); \
 			   { if (iter1 < unum1) { __VA_ARGS__ } };	\
 			 });						\
       } else {								\
@@ -59,7 +59,7 @@
 			 {						\
 			   auto iter1    = item.get_global_id(0);	\
 			   auto lane     = item.get_global_id(2);	\
-			   shared_type* shared_name = shm_acc.get_pointer(); \
+			   auto shared_name = shm_acc.get_multi_ptr<sycl::access::decorated::no>(); \
 			   { __VA_ARGS__ };				\
 			 });						\
       }									\

@@ -11,7 +11,7 @@ function check_package {
 	fi
 }
 #module load oneapi/eng-compiler/2023.12.15.002 python py-numpy
-module load python py-numpy fftw pti-gpu
+module load python py-numpy fftw pti-gpu numactl
 source ~/spack/share/spack/setup-env.sh
 #spack load c-lime
 spack load openssl
@@ -79,7 +79,7 @@ then
 	rm -f master
 	cd lime
 	./autogen.sh
-	./configure
+	./configure CFLAGS="-fPIC" CXXFLAGS="-fPIC"
 	make
 	cd ..
 
@@ -106,10 +106,11 @@ then
         --enable-accelerator=sycl \
         --enable-unified=no \
 	--enable-accelerator-aware-mpi=no \
+	--with-lime=${dep}/lime \
         MPICXX=mpicxx \
         CXX=icpx \
-        LDFLAGS="-fiopenmp -fsycl -fsycl-device-code-split=per_kernel -fsycl-device-lib=all -lze_loader -L${MKLROOT}/lib -qmkl=parallel -fsycl -lsycl -fPIC" \
-        CXXFLAGS="-O3 -fiopenmp -fsycl-unnamed-lambda -fsycl -Wno-tautological-compare -qmkl=parallel -fsycl -fno-exceptions -fPIC"
+        LDFLAGS="-fiopenmp -fsycl -fsycl-device-code-split=per_kernel -fsycl-device-lib=all -fsycl-enable-function-pointers -lze_loader -L${MKLROOT}/lib -qmkl=parallel -fsycl -lsycl -fPIC" \
+        CXXFLAGS="-O0 -fiopenmp -fsycl-unnamed-lambda -fsycl -Wno-tautological-compare -fsycl-enable-function-pointers -qmkl=parallel -fsycl -fno-exceptions -fPIC"
 
 	cd Grid
 	make -j 32

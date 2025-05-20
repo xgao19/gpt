@@ -95,6 +95,11 @@ struct cgpt_project_tensor {
   }
 };
 
+#ifdef GRID_SYCL
+template<class obj> struct sycl::is_device_copyable<cgpt_project_tensor<obj> > : public std::true_type {};
+template<class obj> struct sycl::is_device_copyable<cgpt_project_identity<obj> >: public std::true_type {};
+#endif
+
 template<class T, class C, typename projector_t>
 class cgpt_block_map : public cgpt_block_map_base {
 

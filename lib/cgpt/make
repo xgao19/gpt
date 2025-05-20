@@ -168,7 +168,7 @@ do
 
 		echo " [CXX] $bn"
 		start=$SECONDS
-		${CXX} --shared ${CXXFLAGS} -c $src -o $dst 1> ${BUILD}/logs/${bn}.out 2> ${BUILD}/logs/${bn}.err
+		${CXX} --shared ${CXXFLAGS} -O0 -c $src -o $dst 1> ${BUILD}/logs/${bn}.out 2> ${BUILD}/logs/${bn}.err
 		success=$?
 		elapsed=$((SECONDS-start))
 		if [[ "$success" == "0" ]];

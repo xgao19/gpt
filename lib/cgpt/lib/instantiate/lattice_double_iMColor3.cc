@@ -23,9 +23,13 @@ typedef void* (* create_lattice_prec_otype)(GridBase* grid);
 extern std::map<std::string,create_lattice_prec_otype> _create_otype_;
 extern std::map<std::string,int> _otype_singlet_rank_;
 
+
+
 // explicitly instantiate
 template class cgpt_Lattice<iMColor3<vComplexD>>;
 template void cgpt_unary_from<iMColor3<vComplexD>>(Lattice<iMColor3<vComplexD>>& dst, const Lattice<iMColor3<vComplexD>>& src, PyObject* params);
+
+
 
 void lattice_init_double_iMColor3() {
   std::string prec = "double";
