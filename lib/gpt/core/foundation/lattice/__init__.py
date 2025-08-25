@@ -22,6 +22,9 @@ import numpy
 import gpt.core.foundation.lattice.matrix
 
 
+fingerprint = gpt.default.get_int("--fingerprint", 0) > 1
+
+
 def rank_inner_product(a, b, n_block, use_accelerator):
     otype = a[0].otype
     assert len(otype.v_idx) == len(b[0].otype.v_idx)
@@ -33,17 +36,29 @@ def inner_product(a, b, n_block, use_accelerator):
 
 
 def norm2(l):
-    return (
-        l[0]
-        .grid.globalsum(
-            rank_inner_product(l, l, len(l), True).reshape(len(l))
-        )
-        .real
-    )
+    return l[0].grid.globalsum(rank_inner_product(l, l, len(l), True).reshape(len(l))).real
 
 
 def object_rank_norm2(l):
     return rank_inner_product(l, l, 1, True).real
+
+
+# def cshift_cgpt(t, l, d, o):
+#    for i in t.otype.v_idx:
+#        cgpt.cshift(t.v_obj[i], l.v_obj[i], d, o)
+
+
+cshift_plans = {}
+
+
+def cshift_gpt(t, l, d, o):
+    global cshift_plans
+    tag = f"{t.otype.__name__}_{t.grid}_{t.checkerboard().__name__}_{d}_{o}"
+    if tag not in cshift_plans:
+        plan = gpt.cshift_plan()
+        plan.add(l, [tuple([0 if mu != d else int(o) for mu in range(t.grid.nd)])])
+        cshift_plans[tag] = plan()
+    cshift_plans[tag](t, l)
 
 
 def cshift(first, second, third, fourth):
@@ -58,8 +73,15 @@ def cshift(first, second, third, fourth):
         o = third
         t = gpt.lattice(l)
 
-    for i in t.otype.v_idx:
-        cgpt.cshift(t.v_obj[i], l.v_obj[i], d, o)
+    if fingerprint:
+        lll = gpt.fingerprint.log()
+        lll(f"l.{d}.{o}.{l.grid.processor_coor}.{l.grid.processor}", l)
+
+    cshift_gpt(t, l, d, o)
+
+    if fingerprint:
+        lll("t", t)
+        lll()
     return t
 
 

@@ -19,6 +19,8 @@ U_quad = g.convert(U, g.double_quadruple)
 
 # reference plaquette
 P = g.qcd.gauge.plaquette(U)
+P2 = g.sum(g.qcd.gauge.plaquette(U, field=True)) / grid.gsites
+assert abs(P - P2) < 1e-13
 
 # invariant distance (test axioms)
 ds = g.group.invariant_distance(U[0], U[1])
@@ -305,6 +307,25 @@ ref = g.identity(V)[0, 0, 0, 0]
 for t in range(grid.gdimensions[3] - 1):
     eps2 = g.norm2(Up[3][0, 0, 0, t] - ref)
     g.message(f"Test temporal gauge at t={t}: {eps2}")
+    assert eps2 < 1e-25
+
+# test full tree gauge
+origin = [2, 1, 3, 2]
+V = g.qcd.gauge.fix.tree(U, origin, [0, 1, 2, 3])
+
+Up = g.qcd.gauge.transformed(U, V)
+
+for t in range(grid.gdimensions[3]):
+    if t != origin[3] - 1:
+        eps2 = g.norm2(Up[3][0, 0, 0, t] - ref)
+        g.message(f"Test tree gauge at t={t}: {eps2}")
+        assert eps2 < 1e-25
+
+# spot tests within growing tree branches
+spots = [([2, 1, 3, 2], 0), ([4, 1, 3, 2], 1), ([4, 4, 3, 2], 2), ([4, 4, 5, 2], 3)]
+for spot in spots:
+    eps2 = g.norm2(Up[spot[-1]][tuple(spot[0])] - ref)
+    g.message(f"Test tree gauge at spot={spot}: {eps2}")
     assert eps2 < 1e-25
 
 # test reversibility of local_stout

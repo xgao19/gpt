@@ -16,7 +16,7 @@
 #    with this program; if not, write to the Free Software Foundation, Inc.,
 #    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 #
-import cgpt, gpt, os, shutil, zipfile
+import cgpt, gpt, os, sys, shutil, zipfile, time
 
 
 def cache_file(root, src, md):
@@ -61,6 +61,7 @@ def FILE_exists(fn):
 
 class FILE_base:
     def __init__(self, fn, md):
+        # do not support appending
         if cache_root is not None:
             fn = cache_file(cache_root, fn, md)
         self.f = cgpt.fopen(fn, md)
@@ -72,10 +73,6 @@ class FILE_base:
         if self.f is not None:
             cgpt.fclose(self.f)
 
-    def unbuffer(self):
-        assert self.f is not None
-        cgpt.funbuffer(self.f)
-
     def close(self):
         assert self.f is not None
         cgpt.fclose(self.f)
@@ -83,13 +80,11 @@ class FILE_base:
 
     def tell(self):
         assert self.f is not None
-        r = cgpt.ftell(self.f)
-        return r
+        return cgpt.ftell(self.f)
 
     def seek(self, offset, whence):
         assert self.f is not None
-        r = cgpt.fseek(self.f, offset, whence)
-        return r
+        assert cgpt.fseek(self.f, offset, whence) == 0
 
     def read(self, sz=None):
         if sz is None:
@@ -100,7 +95,10 @@ class FILE_base:
             return self.read(size - pos)
 
         assert self.f is not None
-        t = bytes(sz)
+        try:
+            t = bytes(sz)
+        except OverflowError:
+            raise IOError(f"Cannot allocate {sz} bytes")
         if sz > 0:
             if cgpt.fread(self.f, sz, memoryview(t)) != 1:
                 t = bytes(0)
@@ -111,10 +109,6 @@ class FILE_base:
         if not isinstance(d, memoryview):
             d = memoryview(d)
         assert cgpt.fwrite(self.f, len(d), d) == 1
-
-    def flush(self):
-        assert self.f is not None
-        cgpt.fflush(self.f)
 
 
 class FILE_windowed_reader:

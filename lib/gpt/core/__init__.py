@@ -108,6 +108,7 @@ from gpt.core.coordinates import (
     apply_1S,
     apply_2S,
     correlate,
+    parity,
 )
 from gpt.core.random import random, sha256
 from gpt.core.mem import mem_info, mem_report, accelerator, host
@@ -130,3 +131,4 @@ from gpt.core.einsum import einsum
 import gpt.core.global_sum
 from gpt.core.pack import pack
 from gpt.core.blas import blas
+import gpt.core.fingerprint
