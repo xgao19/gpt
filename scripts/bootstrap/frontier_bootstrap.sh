@@ -11,7 +11,8 @@ function check_package {
 	fi
 }
 
-module load PrgEnv-gnu craype-accel-amd-gfx90a amd-mixed rocm cray-python cray-mpich craype-x86-trento cray-fftw
+#module load PrgEnv-gnu craype-accel-amd-gfx90a amd-mixed rocm cray-python cray-mpich craype-x86-trento cray-fftw
+module load rocm/6.3.1 cray-fftw cray-python craype-accel-amd-gfx90a PrgEnv-gnu/8.6.0
 export MPICH_GPU_SUPPORT_ENABLED=1
 #check_package gcc
 #check_package python3
@@ -70,7 +71,7 @@ then
 	rm -f master
 	cd lime
 	./autogen.sh
-	./configure
+	./configure CFLAGS="-fPIC" CXXFLAGS="-fPIC"
 	make
 	cd ..
 
@@ -96,8 +97,8 @@ then
         --with-lime=${dep}/lime \
 	--with-fftw=$FFTW_ROOT \
         CXX=hipcc MPICXX=mpicxx \
-        CXXFLAGS="-fPIC -I{$ROCM_PATH}/include/ -std=c++14 -I${MPICH_DIR}/include" \
-        LDFLAGS="-L{$ROCM_PATH}/lib -lamdhip64 -L${MPICH_DIR}/lib -lmpi -L${CRAY_MPICH_ROOTDIR}/gtl/lib -lmpi_gtl_hsa -fopenmp -lamdhip64" HIPFLAGS=--amdgpu-target=gfx90a
+        CXXFLAGS="-fPIC -I{$ROCM_PATH}/include/ -std=c++17 -I${MPICH_DIR}/include" \
+        LDFLAGS="-L{$ROCM_PATH}/lib -lamdhip64 -lhipblas -L${MPICH_DIR}/lib -lmpi -L${CRAY_MPICH_ROOTDIR}/gtl/lib -lmpi_gtl_hsa -fopenmp -lamdhip64" HIPFLAGS=--amdgpu-target=gfx90a
 
 	
 #	../configure \
@@ -118,7 +119,7 @@ then
 #    HIPFLAGS=--amdgpu-target=gfx90a 
     
 	cd Grid
-	make -j 6
+	make -j 32
 fi
 
 if [ ! -f ${root}/lib/cgpt/build/cgpt.so ];
@@ -127,7 +128,7 @@ then
 	# cgpt
 	#
 	cd ${root}/lib/cgpt
-	./make ${root}/dependencies/Grid/build 8
+	./make ${root}/dependencies/Grid/build 32
 fi
 
 #cd ${root}/tests
