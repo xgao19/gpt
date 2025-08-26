@@ -189,6 +189,12 @@ jobs:
         sudo update-alternatives --set cc /usr/bin/clang
         sudo update-alternatives --set c++ /usr/bin/clang++
 
+    - name: Set compiler to cc and c++
+      if: matrix.mpi == 'none'
+      run: |
+        echo 'CC=cc' >> $GITHUB_ENV
+        echo 'CXX=c++' >> $GITHUB_ENV
+
     - name: Set MPI alternatives to mpich
       if: matrix.mpi == 'mpich'
       run: |
@@ -363,6 +369,12 @@ jobs:
         sudo update-alternatives --set cc /usr/bin/clang
         sudo update-alternatives --set c++ /usr/bin/clang++
 
+    - name: Set compiler to cc and c++
+      if: matrix.mpi == 'none'
+      run: |
+        echo 'CC=cc' >> $GITHUB_ENV
+        echo 'CXX=c++' >> $GITHUB_ENV
+        
     - name: Set MPI alternatives to mpich
       if: matrix.mpi == 'mpich'
       run: |
