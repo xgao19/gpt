@@ -120,7 +120,7 @@ jobs:
 
         if [ "${{ matrix.mpi }}" == "none" ]
         then
-            ../configure CXXFLAGS=-fPIC --enable-simd=AVX2  --enable-reduction=mpi || cat config.log
+            ../configure CXXFLAGS=-fPIC --enable-simd=AVX2  --enable-reduction=grid || cat config.log
         else
             ../configure CXXFLAGS=-fPIC --enable-simd=AVX2 --enable-comms=mpi-auto  --enable-reduction=mpi || cat config.log
         fi
