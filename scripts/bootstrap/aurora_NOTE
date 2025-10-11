@@ -1,0 +1,18 @@
+GPT:
+————————————————————————————————————————————————————————————
+commit a3d32fdfff90a0aafb5617ea2c4ff377665142ed (HEAD -> scior, origin/scior)
+Author: dbollweg <bollwegdennis@gmail.com>
+Date:   Mon Aug 25 19:52:37 2025 +0000
+
+    remove -O0 added for some debugging work
+————————————————————————————————————————————————————————————
+
+
+Grid:
+————————————————————————————————————————————————————————————
+commit 00f1942dafbc2bed0365a42008ca7c1374de668c (HEAD -> gpt_proton, origin/gpt_proton)
+Author: dbollweg <bollwegdennis@gmail.com>
+Date:   Mon Aug 25 19:06:00 2025 +0000
+
+    acceleratorCopyTo/From fix
+————————————————————————————————————————————————————————————

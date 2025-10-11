@@ -1,0 +1,46 @@
+GPT:
+————————————————————————————————————————————————————————————
+commit 5ce7901fc28dd64425b6cdd6a6705dab96c51db6 (HEAD -> scior, origin/scior)
+Merge: ef89c6db f8c648f0
+Author: dbollweg <bollwegdennis@gmail.com>
+Date:   Wed Mar 12 21:03:31 2025 +0000
+
+    Merge branch 'scior' of https://github.com/dbollweg/gpt into scior
+————————————————————————————————————————————————————————————
+
+Grid:
+————————————————————————————————————————————————————————————
+commit 5ce7901fc28dd64425b6cdd6a6705dab96c51db6 (HEAD -> scior, origin/scior)
+Merge: ef89c6db f8c648f0
+Author: dbollweg <bollwegdennis@gmail.com>
+Date:   Wed Mar 12 21:03:31 2025 +0000
+
+    Merge branch 'scior' of https://github.com/dbollweg/gpt into scior
+————————————————————————————————————————————————————————————
+
+
+Cupy:
+————————————————————————————————————————————————————————————
+export CUPY_INSTALL_USE_HIP=1
+export ROCM_HOME=/opt/rocm-6.2.4
+export HCC_AMDGPU_TARGET=gfx90a
+export CFLAGS="-I${ROCM_HOME}/include -I${ROCM_HOME}/include/hipblas -I${ROCM_HOME}/include/hipsparse -I${ROCM_HOME}/include/hipfft -I${ROCM_HOME}/include/rocsolver"
+————————————————————————————————————————————————————————————
+
+Pyquda:
+————————————————————————————————————————————————————————————
+quda: commit a76d22e9bc9008c640454e30763e5d6e6b304c63 (HEAD -> develop, origin/develop, origin/HEAD)
+Merge: 01ea8cae7 7129b336d
+Author: Evan Weinberg <weinbe2@users.noreply.github.com>
+Date:   Thu May 8 16:38:58 2025 -0400
+
+    Merge pull request #1526 from lattice/feature/adjoint-flow
+    
+    Feature/adjoint flow
+
+cmake .. -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_BUILD_TYPE=RELEASE  -DQUDA_GPU_ARCH=gfx90a -DQUDA_MPI=ON   -DQUDA_COVDEV=ON -DQUDA_MULTIGRID=ON  -DQUDA_DIRAC_DEFAULT_OFF=ON -DQUDA_DIRAC_WILSON=ON -DQUDA_DIRAC_CLOVER=ON -DQUDA_DIRAC_STAGGERED=ON -DQUDA_DIRAC_LAPLACE=ON -DQUDA_CLOVER_DYNAMIC=OFF -DQUDA_CLOVER_RECONSTRUCT=OFF -DQUDA_TARGET_TYPE=HIP -DROCM_PATH=$ROCM_PATH -DCMAKE_CXX_COMPILER=hipcc -DCMAKE_C_COMPILER=hipcc
+
+Pyquda:
+python3 -m pip install --no-cache-dir pyquda==0.10.14 pyquda-utils==0.10.14.post1
+
+————————————————————————————————————————————————————————————
