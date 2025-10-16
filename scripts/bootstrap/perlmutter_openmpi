@@ -1,0 +1,136 @@
+#!/bin/bash
+#
+# Check debian packages
+#
+#export CRAY_ACCEL_TARGET=nvidia80
+#export MPICXX=CC
+export MPICXX=mpicxx
+module load PrgEnv-gnu/8.5.0
+module load cudatoolkit/12.4
+module load cray-python
+module load craype-x86-milan
+module load cray-fftw/3.3.10.6
+module load openmpi/5.0.0
+module load craype-accel-nvidia80
+module list
+
+source ~/myenv/bin/activate
+
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${MPI_ROOT}/lib
+export C_INCLUDE_PATH=$C_INCLUDE_PATH:${MPI_ROOT}/include
+export CPLUS_INCLUDE_PATH=$CPLUS_INCLUDE_PATH:${MPI_ROOT}/include
+echo $LD_LIBRARY_PATH
+
+export OMPI_MCA_btl=^uct,openib
+export UCX_MEMTYPE_CACHE=n
+export UCX_RNDV_SCHEME=put_zcopy
+
+function check_package {
+	dpkg -s $1 1> /dev/null 2> /dev/null
+	if [[ "$?" != "0" ]];
+	then
+		echo "Package $1 needs to be installed first"
+		exit 1
+	fi
+}
+
+#
+# Install python3 if it is not yet there
+#
+echo "Checking numpy"
+hasNumpy=$(python3 -c "import numpy" 2>&1 | grep -c ModuleNotFound)
+if [[ "$hasNumpy" == "1" ]];
+then
+    echo "Install numpy"
+    python3 -m pip install --user numpy
+fi
+
+#
+# Get root directory
+#
+root="$( cd "$( dirname "${BASH_SOURCE[0]}" )/../.." >/dev/null 2>&1 && pwd )"
+
+#
+# Precompile python
+#
+echo "Compile gpt"
+python3 -m compileall ${root}/lib/gpt
+
+
+#
+# Create dependencies and download
+#
+dep=${root}/dependencies
+if [ ! -f ${dep}/Grid/build/Grid/libGrid.a ];
+then
+
+	if [ -d ${dep} ];
+	then
+	    echo "$dep already exists ; rm -rf $dep before bootstrapping again"
+	    exit 1
+	fi
+
+	mkdir -p ${dep}
+	cd ${dep}
+
+	#
+	# Lime
+	#
+	wget https://github.com/usqcd-software/c-lime/tarball/master
+	tar xzf master
+	mv usqcd-software-c-lime* lime
+	rm -f master
+	cd lime
+	./autogen.sh
+	./configure
+	make
+	cd ..
+
+	#
+	# Grid
+	#
+	git clone https://github.com/dbollweg/Grid.git
+	cd Grid
+	git checkout gpt_proton
+	./bootstrap.sh
+	
+	mkdir build
+	cd build
+	../configure \
+    --enable-comms=mpi \
+    --enable-simd=GPU \
+    --enable-shm=nvlink \
+    --enable-gen-simd-width=64 \
+    --enable-accelerator=cuda \
+    --enable-setdevice \
+    --enable-accelerator-cshift \
+    --disable-fermion-reps \
+    --disable-unified \
+    --disable-gparity \
+    CXX=nvcc \
+    CXXFLAGS="-ccbin g++ -gencode arch=compute_80,code=sm_80 -std=c++17 --cudart shared --compiler-options=-fPIC -lcublas -I${FFTW_INC} -I/global/homes/x/xgao/software/install/mpfr-4.1.0/include -I${MPI_ROOT}/include" \
+    LIBS="-lrt -lmpi -lfftw3 -lfftw3f" \
+    LDFLAGS="--cudart shared --compiler-options -fopenmp -lcublas -L${FFTW_DIR} -L/opt/nvidia/hpc_sdk/Linux_x86_64/24.5/math_libs/12.4/lib64 -L/global/homes/x/xgao/mylib -L${MPI_ROOT}/lib"
+                #CXX=nvcc \
+                #CXXFLAGS="-ccbin g++ -gencode arch=compute_80,code=sm_80 -std=c++17 --cudart shared --compiler-options=-fPIC -lcublas -I${FFTW_INC} -I/global/homes/x/xgao/software/install/mpfr-4.1.0/include -I${MPI_ROOT}/include" \
+                #LIBS="-lrt" \
+                #LDFLAGS="--cudart shared --compiler-options -fopenmp -lcublas -L${FFTW_DIR} -L/opt/nvidia/hpc_sdk/Linux_x86_64/24.5/math_libs/12.4/lib64 -L/global/homes/x/xgao/mylib -L${MPI_ROOT}/lib"
+    cd Grid
+    make -j 32
+fi
+
+if [ ! -f ${root}/lib/cgpt/build/cgpt.so ];
+then
+	#
+	# cgpt
+	#
+	cd ${root}/lib/cgpt
+	./make ${root}/dependencies/Grid/build 32
+fi
+
+#cd ${root}/tests
+source ${root}/lib/cgpt/build/source.sh
+#./run "" "--mpi_split 1.1.1.1"
+
+echo "To use:"
+echo "source ${root}/lib/cgpt/build/source.sh"
